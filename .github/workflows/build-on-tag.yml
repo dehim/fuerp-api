@@ -1,0 +1,44 @@
+name: Build Frontend on Tag
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  build:
+    runs-on: self-hosted # 使用你自己的 runner
+    steps:
+      # 1. 拉取最新代码
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. 安装依赖
+      - name: Install dependencies
+        run: npm install
+
+      # 3. 构建
+      - name: Build project
+        run: npm run build
+
+      # 4. 更新网站目录
+      - name: Deploy build (atomic with rollback)
+        run: |
+          set -e
+
+          TS=$(date +%Y%m%d_%H%M%S)
+          BASE=/shareVolume/www
+          NAME=fuerp-api
+          NEW=${BASE}/${NAME}_${TS}
+          CURRENT=${BASE}/${NAME}
+
+          mv dist "${NEW}"
+
+          if [ -d "${CURRENT}" ]; then
+            mv "${CURRENT}" "${CURRENT}_bak_$(date +%s)"
+          fi
+
+          mv "${NEW}" "${CURRENT}"
+
+          # 只保留最近 3 个备份
+          ls -dt ${BASE}/${NAME}_bak_* 2>/dev/null | tail -n +4 | xargs -r rm -rf
