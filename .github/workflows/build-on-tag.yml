@@ -1,4 +1,4 @@
-name: Build Frontend on Tag
+name: Deploy Yii2 Backend on Tag
 
 on:
   push:
@@ -6,39 +6,79 @@ on:
       - "*"
 
 jobs:
-  build:
-    runs-on: self-hosted # 使用你自己的 runner
+  deploy:
+    runs-on: self-hosted
+
     steps:
-      # 1. 拉取最新代码
+      # 1️⃣ 拉取代码
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. 安装依赖
-      - name: Install dependencies
-        run: npm install
-
-      # 3. 构建
-      - name: Build project
-        run: npm run build
-
-      # 4. 更新网站目录
-      - name: Deploy build (atomic with rollback)
+      # 2️⃣ 准备发布目录
+      - name: Prepare release directory
         run: |
           set -e
 
           TS=$(date +%Y%m%d_%H%M%S)
-          BASE=/shareVolume/www
-          NAME=fuerp-api
-          NEW=${BASE}/${NAME}_${TS}
-          CURRENT=${BASE}/${NAME}
+          BASE=/shareVolume/www/fuerp-api
+          RELEASES=${BASE}/releases
+          NEW_RELEASE=${RELEASES}/${TS}
 
-          mv dist "${NEW}"
+          mkdir -p "${NEW_RELEASE}"
+          rsync -a --delete ./ "${NEW_RELEASE}/"
 
-          if [ -d "${CURRENT}" ]; then
-            mv "${CURRENT}" "${CURRENT}_bak_$(date +%s)"
+          echo "NEW_RELEASE=${NEW_RELEASE}" >> $GITHUB_ENV
+          echo "BASE=${BASE}" >> $GITHUB_ENV
+
+      # 3️⃣ Composer install（如果存在 composer.json）
+      - name: Composer install (if needed)
+        run: |
+          set -e
+          cd "${NEW_RELEASE}"
+
+          if [ -f composer.json ]; then
+            echo "composer.json found, running composer install"
+            composer install \
+              --no-dev \
+              --prefer-dist \
+              --optimize-autoloader \
+              --no-interaction
+          else
+            echo "composer.json not found, skip composer install"
           fi
 
-          mv "${NEW}" "${CURRENT}"
+      # 4️⃣ Yii2 初始化 & 常规优化（可选）
+      - name: Yii2 prepare (if yii exists)
+        run: |
+          set -e
+          cd "${NEW_RELEASE}"
 
-          # 只保留最近 3 个备份
-          ls -dt ${BASE}/${NAME}_bak_* 2>/dev/null | tail -n +4 | xargs -r rm -rf
+          if [ -f yii ]; then
+            echo "Yii detected, running yii optimizations"
+            php yii cache/flush-all || true
+            php yii migrate --interactive=0 || true
+          else
+            echo "yii not found, skip yii steps"
+          fi
+
+      # 5️⃣ 原子切换
+      - name: Atomic deploy
+        run: |
+          set -e
+
+          CURRENT=${BASE}/current
+          PREV=${BASE}/previous
+
+          if [ -L "${CURRENT}" ]; then
+            rm -f "${PREV}"
+            mv "$(readlink ${CURRENT})" "${PREV}" || true
+          fi
+
+          ln -sfn "${NEW_RELEASE}" "${CURRENT}"
+
+      # 6️⃣ 清理旧版本（保留 3 份）
+      - name: Cleanup old releases
+        run: |
+          set -e
+          cd "${BASE}/releases"
+          ls -dt */ | tail -n +4 | xargs -r rm -rf
