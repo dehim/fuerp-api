@@ -29,6 +29,13 @@ return (new Config())
         /* ========= 基础标准 ========= */
         '@PSR12' => true,
 
+        /* ========= 数组美化 ========= */
+        'array_indentation' => true,
+        'array_syntax' => ['syntax' => 'short'],
+        'binary_operator_spaces' => [
+            'default' => 'single_space',
+        ],
+
         /* ========= Yii2 / PHPDoc ========= */
         'phpdoc_align' => false,
         'phpdoc_separation' => true,
