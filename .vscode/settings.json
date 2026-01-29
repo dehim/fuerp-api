@@ -11,7 +11,7 @@
   /* ========= 默认格式化器 ========= */
   "editor.defaultFormatter": "esbenp.prettier-vscode",
 
-  /* ========= 各语言格式策略 ========= */
+  /* ========= 前端语言 ========= */
   "[vue]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
@@ -31,18 +31,35 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
 
-  /* ========= Vue / TS 体验 ========= */
+  /* ========= PHP / Yii2 ========= */
+  "[php]": {
+    "editor.defaultFormatter": "junstyle.php-cs-fixer"
+  },
+
+  "php.validate.enable": true,
+  "php.validate.executablePath": "D:\\phpstudy_pro\\Extensions\\php\\php8.4.15nts\\php.exe",
+
+  /* php-cs-fixer（CLI + PHP 版本对齐） */
+  "php-cs-fixer.executablePath": "C:\\Users\\dehim\\AppData\\Roaming\\Composer\\vendor\\bin\\php-cs-fixer.bat",
+  "php-cs-fixer.phpExecutablePath": "D:\\phpstudy_pro\\Extensions\\php\\php8.4.15nts\\php.exe",
+
+  /* ========= Intelephense ========= */
+  "intelephense.environment.phpVersion": "8.4",
+  "intelephense.files.maxSize": 5000000,
+  "intelephense.completion.insertUseDeclaration": true,
+
+  /* ========= Vue / TS ========= */
   "vue.volar.takeOverMode.enabled": true,
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.preferences.importModuleSpecifier": "non-relative",
 
-  /* ========= Tailwind 友好 ========= */
+  /* ========= Tailwind ========= */
   "css.lint.unknownAtRules": "ignore",
   "tailwindCSS.experimental.classRegex": [
     ["class\\s*=\\s*\"([^\"]*)\"", "\"([^\"]*)\""]
   ],
 
-  /* ========= 其他细节 ========= */
+  /* ========= 文件细节 ========= */
   "files.eol": "\n",
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true
