@@ -33,15 +33,28 @@
 
   /* ========= PHP / Yii2 ========= */
   "[php]": {
-    "editor.defaultFormatter": "junstyle.php-cs-fixer"
+    "editor.defaultFormatter": "junstyle.php-cs-fixer",
+    "editor.formatOnSave": true
   },
 
   "php.validate.enable": true,
   "php.validate.executablePath": "D:\\phpstudy_pro\\Extensions\\php\\php8.4.15nts\\php.exe",
+  "php.suggest.basic": false,
 
-  /* php-cs-fixer（CLI + PHP 版本对齐） */
-  "php-cs-fixer.executablePath": "C:\\Users\\dehim\\AppData\\Roaming\\Composer\\vendor\\bin\\php-cs-fixer.bat",
-  "php-cs-fixer.phpExecutablePath": "D:\\phpstudy_pro\\Extensions\\php\\php8.4.15nts\\php.exe",
+  /* ========= php-cs-fixer ========= */
+  "php-cs-fixer.config": ".php-cs-fixer.php",
+  "php-cs-fixer.ignorePHPVersion": true,
+  "php-cs-fixer.onsave": false,
+  "php-cs-fixer.rules": "@PSR2",
+  "php-cs-fixer.allowRisky": false,
+  "php-cs-fixer.pathMode": "override",
+  "php-cs-fixer.exclude": [],
+  "php-cs-fixer.autoFixByBracket": true,
+  "php-cs-fixer.autoFixBySemicolon": false,
+  "php-cs-fixer.formatHtml": false,
+  "php-cs-fixer.documentFormattingProvider": true,
+  "php-cs-fixer.executablePath": "${workspaceFolder}/vendor/bin/php-cs-fixer",
+  "php-cs-fixer.executablePathWindows": "${workspaceFolder}/vendor/bin/php-cs-fixer.bat",
 
   /* ========= Intelephense ========= */
   "intelephense.environment.phpVersion": "8.4",
