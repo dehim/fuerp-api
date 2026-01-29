@@ -8,6 +8,8 @@
 
 # visual studio code project files
 .vscode
+!.vscode/extensions.json
+!.vscode/settings.json
 
 # netbeans project files
 nbproject
