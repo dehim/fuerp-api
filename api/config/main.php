@@ -38,7 +38,15 @@ return [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
             'rules' => [
-                'v1/<controller>/<action>' => 'v1/<controller>/<action>',
+                // ✅ 显式版本（优先）
+                'v<version:\d+>/<controller>/<action>' => 'v<version>/<controller>/<action>',
+
+                // ✅ 默认版本（无 v 前缀）
+                // '<controller>/<action>' => 'v1/<controller>/<action>',
+
+                // ✅ 根路径 /
+                '' => 'v1/site/index',
+
             ],
         ],
 
