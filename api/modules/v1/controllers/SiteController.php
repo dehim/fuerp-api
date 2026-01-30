@@ -2,20 +2,35 @@
 
 namespace api\modules\v1\controllers;
 
+use api\components\ApiResponse;
 use yii\web\Controller;
 
 class SiteController extends Controller
 {
-    public function actionIndex()
+    /**
+     * GET /v1/site/ping
+     *
+     * 不验签接口：
+     * - 用于前端时间同步
+     * - 用于健康检查
+     */
+    public function actionPing()
     {
-        return [
-            'code' => 0,
-            'message' => 'ok',
-            'data' => [
-                'service' => 'fuerp-api',
-                'version' => 'v1',
-            ],
-        ];
+        $now = time();
+
+        return ApiResponse::success([
+            'server_time' => $now,
+            'timezone' => date_default_timezone_get(),
+            'iso' => gmdate('c', $now),
+        ]);
     }
 
+    /**
+     * GET /v1/site/index
+     * （你原来的默认首页）
+     */
+    public function actionIndex()
+    {
+        return ApiResponse::success('api is running');
+    }
 }

@@ -18,6 +18,7 @@ class ApiSignatureBootstrap implements BootstrapInterface
             $whitelist = [
                 '',
                 'v1/site/index',
+                'v1/site/ping', // ⬅️ 时间同步 / 健康检查
             ];
 
             if (in_array($path, $whitelist, true)) {
