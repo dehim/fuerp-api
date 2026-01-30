@@ -11,7 +11,7 @@ return [
     'id' => 'fuerp-api',
     'basePath' => dirname(__DIR__),
     'controllerNamespace' => 'api\\controllers',
-    'bootstrap' => ['log'],
+    'bootstrap' => ['log', api\components\ApiSignatureBootstrap::class],
     'modules' => [
         'v1' => [
             'class' => 'api\\modules\\v1\\Module',
