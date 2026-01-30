@@ -71,7 +71,7 @@ jobs:
             php yii migrate --interactive=0 || true
           fi
 
-      # 6️⃣ 原子切换
+      # 6️⃣ 原子切换（修正版）
       - name: Atomic deploy
         run: |
           set -e
@@ -79,11 +79,18 @@ jobs:
           CURRENT=${BASE}/current
           PREV=${BASE}/previous
 
+          # 如果 current 是软链接，先处理 previous
           if [ -L "${CURRENT}" ]; then
-            rm -f "${PREV}"
-            mv "$(readlink ${CURRENT})" "${PREV}" || true
+            # 如果 previous 已存在（不管是文件、目录、软链），先删掉
+            if [ -e "${PREV}" ] || [ -L "${PREV}" ]; then
+              rm -rf "${PREV}"
+            fi
+
+            # 把 current 指向的真实目录挪到 previous
+            mv "$(readlink ${CURRENT})" "${PREV}"
           fi
 
+          # current 原子切换
           ln -sfn "${NEW_RELEASE}" "${CURRENT}"
 
       # 7️⃣ 清理旧版本（保留 3 份）
