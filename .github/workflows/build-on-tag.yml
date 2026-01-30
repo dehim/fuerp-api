@@ -16,7 +16,7 @@ jobs:
             base: /shareVolume/www/fuerp-api-prod
             yii_env: Production
             composer_flags: "--no-dev --prefer-dist --optimize-autoloader"
-          - name: test
+          - name: dev
             base: /shareVolume/www/fuerp-api-dev
             yii_env: Development
             composer_flags: "--prefer-dist"
@@ -99,3 +99,8 @@ jobs:
           set -e
           cd "${BASE}/releases"
           ls -dt */ | tail -n +4 | xargs -r rm -rf
+
+# # 旧版回滚命令示例：
+# cd /shareVolume/www/fuerp-api-prod
+# rm current
+# ln -s previous current
