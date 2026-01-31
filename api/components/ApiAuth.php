@@ -34,7 +34,6 @@ class ApiAuth
             );
         }
 
-        // nonce 强制要求（你既然决定用，就要用到底）
         if (!$nonce) {
             throw new BusinessException(
                 ApiCode::PARAM_MISSING,
@@ -44,7 +43,6 @@ class ApiAuth
 
         // ====== 客户端校验 ======
         $clients = Yii::$app->params['apiClients'] ?? [];
-
         if (!isset($clients[$appKey])) {
             throw new BusinessException(ApiCode::UNAUTHORIZED, '未知客户端');
         }
@@ -60,21 +58,31 @@ class ApiAuth
         $data = $params;
         unset($data['signature']);
 
+        // ⚠️ 稳定排序（关键）
         ksort($data);
 
+        $canonicalQuery = http_build_query(
+            $data,
+            '',
+            '&',
+            PHP_QUERY_RFC3986
+        );
+
+        // ====== StringToSign ======
         $stringToSign = implode("\n", [
             strtoupper($method),
             $path,
-            http_build_query($data),
+            $canonicalQuery,
         ]);
 
+        // ====== HMAC-SHA256 ======
         $calculated = hash_hmac('sha256', $stringToSign, $appSecret);
 
         if (!hash_equals($calculated, $signature)) {
             throw new BusinessException(ApiCode::UNAUTHORIZED, '签名验证失败');
         }
 
-        // ====== nonce 重放校验（签名通过后再做） ======
+        // ====== nonce 防重放 ======
         self::checkAndStoreNonce($appKey, $nonce);
     }
 
