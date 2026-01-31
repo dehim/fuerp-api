@@ -6,9 +6,8 @@ use api\components\ApiCode;
 use api\components\ApiResponse;
 use api\exceptions\BusinessException;
 use Yii;
-use yii\web\Controller;
 
-class TestController extends Controller
+class TestController extends ApiController
 {
     public function actionIndex()
     {

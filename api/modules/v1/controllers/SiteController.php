@@ -3,9 +3,8 @@
 namespace api\modules\v1\controllers;
 
 use api\components\ApiResponse;
-use yii\web\Controller;
 
-class SiteController extends Controller
+class SiteController extends ApiController
 {
     /**
      * GET /v1/site/ping
