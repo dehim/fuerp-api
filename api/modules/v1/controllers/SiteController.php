@@ -3,11 +3,12 @@
 namespace api\modules\v1\controllers;
 
 use api\components\ApiResponse;
+use Yii;
 
 class SiteController extends ApiController
 {
     /**
-     * GET /v1/site/ping
+     * GET / POST /v1/site/ping
      *
      * 不验签接口：
      * - 用于前端时间同步
@@ -15,18 +16,36 @@ class SiteController extends ApiController
      */
     public function actionPing()
     {
-        $now = time();
+        $serverTime = time();
+
+        $request = Yii::$app->request;
+
+        // 尝试从 POST JSON 中获取 local_time
+        $localTime = null;
+
+        if ($request->isPost) {
+            $body = $request->getBodyParams();
+            if (isset($body['local_time']) && is_numeric($body['local_time'])) {
+                $localTime = (int)$body['local_time'];
+            }
+        }
+
+        // 若未提供本地时间，则认为客户端时间 == 服务器时间
+        $offset = 0;
+        if ($localTime !== null) {
+            $offset = $serverTime - $localTime;
+        }
 
         return ApiResponse::success([
-            'server_time' => $now,
+            'server_time' => $serverTime,
             'timezone' => date_default_timezone_get(),
-            'iso' => gmdate('c', $now),
+            'iso' => gmdate('c', $serverTime),
+            'offset' => $offset, // 单位：秒（server - client）
         ]);
     }
 
     /**
      * GET /v1/site/index
-     * （你原来的默认首页）
      */
     public function actionIndex()
     {
