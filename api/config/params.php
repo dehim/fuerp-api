@@ -5,6 +5,9 @@ return [
     'apiName' => 'Fuerp API',
     'cors' => [
         'origins' => [
+            'https://fuerp.com',
+            'https://fuerp.net',
+            'https://fuerp.cn',
             'https://www.fuerp.com',
             'https://www.fuerp.net',
             'https://www.fuerp.cn',
