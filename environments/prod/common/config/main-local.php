@@ -2,12 +2,27 @@
 
 return [
     'components' => [
+        // 'db' => [
+        //     'class' => \yii\db\Connection::class,
+        //     'dsn' => 'mysql:host=localhost;dbname=yii2advanced',
+        //     'username' => 'root',
+        //     'password' => '',
+        //     'charset' => 'utf8',
+        // ],
         'db' => [
-            'class' => \yii\db\Connection::class,
-            'dsn' => 'mysql:host=localhost;dbname=yii2advanced',
-            'username' => 'root',
-            'password' => '',
+            'class' => 'yii\db\Connection',
+            'dsn' => 'sqlite:/shareVolume/web/data/fuerp/database.db',
             'charset' => 'utf8',
+            'on afterOpen' => function ($event) {
+                $db = $event->sender;
+                $db->createCommand('PRAGMA foreign_keys = ON')->execute();
+                $db->createCommand('PRAGMA journal_mode = WAL')->execute();
+                $db->createCommand('PRAGMA synchronous = NORMAL')->execute();
+            },
+            'attributes' => [
+                // use a smaller connection timeout
+                // PDO::ATTR_TIMEOUT => 10,
+            ],
         ],
         'redis' => [
             'class' => 'yii\redis\Connection',
