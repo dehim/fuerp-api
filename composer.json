@@ -26,6 +26,11 @@
     "codeception/verify": "3.0.0",
     "friendsofphp/php-cs-fixer": "3.93.1"
   },
+  "autoload": {
+    "psr-4": {
+      "api\\": "api/"
+    }
+  },
   "autoload-dev": {
     "psr-4": {
       "common\\tests\\": [
