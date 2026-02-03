@@ -31,6 +31,8 @@ jobs:
         run: |
           set -e
 
+          echo "当前全局变量："
+          printenv
           TS=$(date +%Y%m%d_%H%M%S)
           BASE=${{ matrix.env.base }}
           RELEASES=${BASE}/releases
@@ -93,7 +95,41 @@ jobs:
           # current 原子切换
           ln -sfn "${NEW_RELEASE}" "${CURRENT}"
 
-      # 7️⃣ 清理旧版本（保留 3 份）
+      # 7️⃣ Supervisor 重启相关进程
+      - name: Restart Supervisor processes
+        run: |
+          set -e
+
+          supervisorctl_safe_exec() {
+              local process_name="$1"
+
+              STATUS=$(sudo supervisorctl status "$process_name" 2>&1 || true)
+
+              if echo "$STATUS" | grep -q "no such process"; then
+                  echo "进程 $process_name 不存在，跳过"
+                  return 0
+              fi
+
+              if echo "$STATUS" | grep -q "RUNNING"; then
+                  echo "进程 $process_name 正在运行，执行 restart"
+                  sudo supervisorctl restart "$process_name" || true
+                  return 0
+              fi
+
+              if echo "$STATUS" | grep -Eq "FATAL|STOPPED|EXITED|BACKOFF"; then
+                  echo "进程 $process_name 当前状态异常，执行 start"
+                  sudo supervisorctl start "$process_name" || true
+                  return 0
+              fi
+
+              echo "进程 $process_name 状态未知："
+              echo "$STATUS"
+              return 0
+          }
+
+          supervisorctl_safe_exec "php-yii-task-worker-fuerp-api"
+
+      # 8️⃣ 清理旧版本（保留 3 份）
       - name: Cleanup old releases
         run: |
           set -e
