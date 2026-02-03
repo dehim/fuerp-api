@@ -31,6 +31,8 @@ jobs:
         run: |
           set -e
 
+          echo "当前全局变量："
+          printenv
           TS=$(date +%Y%m%d_%H%M%S)
           BASE=${{ matrix.env.base }}
           RELEASES=${BASE}/releases
@@ -93,7 +95,44 @@ jobs:
           # current 原子切换
           ln -sfn "${NEW_RELEASE}" "${CURRENT}"
 
-      # 7️⃣ 清理旧版本（保留 3 份）
+      # 7️⃣ Supervisor 重启相关进程
+      - name: Restart Supervisor processes
+        run: |
+          set -e
+
+          supervisorctl_safe_exec() {
+              local action="$1"
+              local process_name="$2"
+
+              if sudo supervisorctl status "$process_name" 2>&1 | grep -q "no such process"; then
+                  echo "进程 $process_name 不存在，跳过 $action"
+              else
+                  echo "执行: sudo supervisorctl $action $process_name"
+                  sudo supervisorctl "$action" "$process_name"
+              fi
+          }
+
+          # 可以根据不同项目扩展更多进程
+          supervisor_restart() {
+              local project="$1"
+              local action="restart"
+
+              case "$project" in
+                  FuerpAPI)
+                      for queue in "php-yii-task-worker-fuerp-api"; do
+                          supervisorctl_safe_exec $action $queue
+                      done
+                  ;;
+                  *)
+                      echo "没有配置需要重启的进程"
+                  ;;
+              esac
+          }
+
+          # CI_SOURCE_NAME 可换成 matrix.env.name 或固定项目名
+          supervisor_restart "FuerpAPI"
+
+      # 8️⃣ 清理旧版本（保留 3 份）
       - name: Cleanup old releases
         run: |
           set -e
