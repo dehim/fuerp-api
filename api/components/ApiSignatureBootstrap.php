@@ -14,6 +14,17 @@ class ApiSignatureBootstrap implements BootstrapInterface
             $request = $app->request;
             $path = trim($request->pathInfo, '/');
 
+            $params = array_merge(
+                $request->getQueryParams(),
+                $request->getBodyParams()
+            );
+
+            // ====== debug 模式请求 ======
+            if ($params['_mode'] === 'debug') {
+                // ✅ 明确：debug 模式不验签
+                return;
+            }
+
             // ====== 全局白名单 ======
             $whitelist = [
                 '',
