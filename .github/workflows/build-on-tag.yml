@@ -101,36 +101,33 @@ jobs:
           set -e
 
           supervisorctl_safe_exec() {
-              local action="$1"
-              local process_name="$2"
+              local process_name="$1"
 
-              if sudo supervisorctl status "$process_name" 2>&1 | grep -q "no such process"; then
-                  echo "进程 $process_name 不存在，跳过 $action"
-              else
-                  echo "执行: sudo supervisorctl $action $process_name"
-                  sudo supervisorctl "$action" "$process_name"
+              STATUS=$(sudo supervisorctl status "$process_name" 2>&1 || true)
+
+              if echo "$STATUS" | grep -q "no such process"; then
+                  echo "进程 $process_name 不存在，跳过"
+                  return 0
               fi
+
+              if echo "$STATUS" | grep -q "RUNNING"; then
+                  echo "进程 $process_name 正在运行，执行 restart"
+                  sudo supervisorctl restart "$process_name" || true
+                  return 0
+              fi
+
+              if echo "$STATUS" | grep -Eq "FATAL|STOPPED|EXITED|BACKOFF"; then
+                  echo "进程 $process_name 当前状态异常，执行 start"
+                  sudo supervisorctl start "$process_name" || true
+                  return 0
+              fi
+
+              echo "进程 $process_name 状态未知："
+              echo "$STATUS"
+              return 0
           }
 
-          # 可以根据不同项目扩展更多进程
-          supervisor_restart() {
-              local project="$1"
-              local action="restart"
-
-              case "$project" in
-                  FuerpAPI)
-                      for queue in "php-yii-task-worker-fuerp-api"; do
-                          supervisorctl_safe_exec $action $queue
-                      done
-                  ;;
-                  *)
-                      echo "没有配置需要重启的进程"
-                  ;;
-              esac
-          }
-
-          # CI_SOURCE_NAME 可换成 matrix.env.name 或固定项目名
-          supervisor_restart "FuerpAPI"
+          supervisorctl_safe_exec "php-yii-task-worker-fuerp-api"
 
       # 8️⃣ 清理旧版本（保留 3 份）
       - name: Cleanup old releases
