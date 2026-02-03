@@ -20,7 +20,7 @@ class ApiSignatureBootstrap implements BootstrapInterface
             );
 
             // ====== debug 模式请求 ======
-            if ($params['_mode'] === 'debug') {
+            if (isset($params['_mode']) && $params['_mode'] === 'debug') {
                 // ✅ 明确：debug 模式不验签
                 return;
             }
