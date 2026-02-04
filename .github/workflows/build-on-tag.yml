@@ -127,7 +127,7 @@ jobs:
               return 0
           }
 
-          supervisorctl_safe_exec "php-yii-task-worker-fuerp-api"
+          supervisorctl_safe_exec "fuerp-api-${{ matrix.env.name }}-task-worker"
 
       # 8️⃣ 清理旧版本（保留 3 份）
       - name: Cleanup old releases
