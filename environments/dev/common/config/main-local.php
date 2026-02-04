@@ -11,7 +11,7 @@ return [
         // ],
         'db' => [
             'class' => 'yii\db\Connection',
-            'dsn' => 'sqlite:/shareVolume/web/data/fuerp/database.db',
+            'dsn' => 'sqlite:/shareVolume/web/data/fuerp-api-dev/database.db',
             'charset' => 'utf8',
             'on afterOpen' => function ($event) {
                 $db = $event->sender;
