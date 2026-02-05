@@ -79,7 +79,7 @@ class TaskWorkerController extends Controller
 
         try {
             // ⏳ 模拟耗时
-            sleep(1);
+            sleep(20);
 
             $task->status = 'done';
             $task->finished_at = time();
