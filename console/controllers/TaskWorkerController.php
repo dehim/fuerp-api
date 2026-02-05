@@ -18,7 +18,7 @@ class TaskWorkerController extends Controller
         $redis = Yii::$app->redis;
         $queueKey = 'task:queue';
 
-        echo "Task worker started...\n";
+        $this->log('Task worker started...');
 
         while (true) {
             // 阻塞弹出任务，timeout 5秒
@@ -37,7 +37,7 @@ class TaskWorkerController extends Controller
             $taskId = $payload['task_id'] ?? null;
 
             if (!$taskId) {
-                echo "Invalid task payload: {$payloadJson}\n";
+                $this->log("Invalid task payload: {$payloadJson}");
                 continue;
             }
 
@@ -47,13 +47,21 @@ class TaskWorkerController extends Controller
 
     protected function processTask(string $taskId): void
     {
-        echo "Processing task: {$taskId}\n";
 
         /** @var Task|null $task */
         $task = Task::findOne(['id' => $taskId]);
 
+        // 检查任务状态，防止重复处理
+        if ($task->status !== 'pending') {
+            $this->log("Skip task {$taskId}, status={$task->status}");
+
+            return;
+        }
+
+        $this->log("Processing task: {$taskId}");
+
         if (!$task) {
-            echo "Task not found: {$taskId}\n";
+            $this->log("Task not found: {$taskId}");
 
             return;
         }
@@ -74,7 +82,7 @@ class TaskWorkerController extends Controller
             $task->finished_at = time();
             $task->save(false);
 
-            echo "Task finished: {$taskId}\n";
+            $this->log("Task finished: {$taskId}");
 
         } catch (\Throwable $e) {
             $task->status = 'failed';
@@ -84,7 +92,14 @@ class TaskWorkerController extends Controller
 
             Yii::error($e->getMessage(), 'task.worker');
 
-            echo "Task failed: {$taskId}\n";
+            $this->log("Task failed: {$taskId}, error={$e->getMessage()}");
         }
     }
+
+    protected function log(string $message): void
+    {
+        $time = date('Y-m-d H:i:s');
+        echo "[{$time}] {$message}\n";
+    }
+
 }
