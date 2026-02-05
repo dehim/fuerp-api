@@ -8,6 +8,9 @@ use yii\console\Controller;
 
 class TaskWorkerController extends Controller
 {
+    protected int $lastHeartbeatAt = 0;
+    protected int $heartbeatInterval = 3600; // 1 小时
+
     /**
      * 启动任务消费
      *
@@ -21,6 +24,10 @@ class TaskWorkerController extends Controller
         $this->log('Task worker started...');
 
         while (true) {
+
+            // 心跳检测
+            $this->heartbeat();
+
             // 阻塞弹出任务，timeout 5秒
             $data = $redis->brpop($queueKey, 5);
 
@@ -100,6 +107,25 @@ class TaskWorkerController extends Controller
     {
         $time = date('Y-m-d H:i:s');
         echo "[{$time}] {$message}\n";
+    }
+
+    /**
+     * 心跳日志
+     */
+    protected function heartbeat(): void
+    {
+        $now = time();
+
+        if ($this->lastHeartbeatAt === 0) {
+            $this->lastHeartbeatAt = $now;
+
+            return;
+        }
+
+        if (($now - $this->lastHeartbeatAt) >= $this->heartbeatInterval) {
+            $this->log('Worker heartbeat: alive');
+            $this->lastHeartbeatAt = $now;
+        }
     }
 
 }
