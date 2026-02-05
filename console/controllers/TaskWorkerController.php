@@ -54,37 +54,33 @@ class TaskWorkerController extends Controller
 
     protected function processTask(string $taskId): void
     {
+        // 原子抢任务
+        $rows = Task::updateAll(
+            [
+                'status' => 'processing',
+                'started_at' => time(),
+            ],
+            [
+                'id' => $taskId,
+                'status' => 'pending',
+            ]
+        );
 
-        /** @var Task|null $task */
-        $task = Task::findOne(['id' => $taskId]);
-
-        // 检查任务状态，防止重复处理
-        if ($task->status !== 'pending') {
-            $this->log("Skip task {$taskId}, status={$task->status}");
+        if ($rows === 0) {
+            $this->log("Skip task {$taskId}, already processed or not pending");
 
             return;
         }
 
         $this->log("Processing task: {$taskId}");
 
-        if (!$task) {
-            $this->log("Task not found: {$taskId}");
-
-            return;
-        }
+        /** @var Task $task */
+        $task = Task::findOne(['id' => $taskId]);
 
         try {
-            // 标记开始
-            $task->status = 'processing';
-            $task->started_at = time();
-            $task->save(false);
-
-            /**
-             * ⏳ v1 阶段：模拟耗时任务
-             */
+            // ⏳ 模拟耗时
             sleep(1);
 
-            // 标记完成
             $task->status = 'done';
             $task->finished_at = time();
             $task->save(false);
@@ -98,7 +94,6 @@ class TaskWorkerController extends Controller
             $task->save(false);
 
             Yii::error($e->getMessage(), 'task.worker');
-
             $this->log("Task failed: {$taskId}, error={$e->getMessage()}");
         }
     }
