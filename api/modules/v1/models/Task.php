@@ -2,8 +2,6 @@
 
 namespace api\modules\v1\models;
 
-use Yii;
-
 /**
  * This is the model class for table "task".
  *
@@ -17,11 +15,11 @@ use Yii;
  * @property int $created_at
  * @property int|null $started_at
  * @property int|null $finished_at
+ * @property int $retry_count
+ * @property int $max_retry
  */
 class Task extends \yii\db\ActiveRecord
 {
-
-
     /**
      * {@inheritdoc}
      */
@@ -37,9 +35,11 @@ class Task extends \yii\db\ActiveRecord
     {
         return [
             [['output_path', 'options', 'error_message', 'started_at', 'finished_at'], 'default', 'value' => null],
+            [['retry_count'], 'default', 'value' => 0],
+            [['max_retry'], 'default', 'value' => 3],
             [['id', 'type', 'status', 'input_path', 'created_at'], 'required'],
             [['input_path', 'output_path', 'options', 'error_message'], 'string'],
-            [['created_at', 'started_at', 'finished_at'], 'integer'],
+            [['created_at', 'started_at', 'finished_at','retry_count','max_retry'], 'integer'],
             [['id', 'type'], 'string', 'max' => 32],
             [['status'], 'string', 'max' => 16],
             [['id'], 'unique'],
@@ -62,6 +62,8 @@ class Task extends \yii\db\ActiveRecord
             'created_at' => 'Created At',
             'started_at' => 'Started At',
             'finished_at' => 'Finished At',
+            'retry_count' => 'Retry Count',
+            'max_retry' => 'Max Retry',
         ];
     }
 

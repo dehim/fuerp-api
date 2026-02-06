@@ -12,13 +12,11 @@ class TaskWorkerController extends Controller
     protected int $heartbeatInterval = 3600; // 1 小时
 
     protected int $lastRecoverAt = 0;
-    protected int $recoverInterval = 300; // 5 分钟扫描一次卡死任务
+    protected int $recoverInterval = 300; // 5 分钟
 
-    protected int $taskTimeout = 600; // 任务超时阈值：10 分钟
+    protected int $taskTimeout = 600; // 10 分钟
 
     /**
-     * 启动任务消费
-     *
      * ./yii task-worker/run
      */
     public function actionRun()
@@ -27,17 +25,13 @@ class TaskWorkerController extends Controller
 
         while (true) {
 
-            // ❤️ 心跳
             $this->heartbeat();
 
-            // ♻️ 卡死任务回收
             $this->recoverStuckTasks();
 
-            // 🚜 拉取下一个 pending 任务
             $task = $this->fetchNextPendingTask();
 
             if (!$task) {
-                // 没任务就歇一会
                 sleep(2);
                 continue;
             }
@@ -47,7 +41,7 @@ class TaskWorkerController extends Controller
     }
 
     /**
-     * 原子获取一个 pending 任务（严格版）
+     * 原子抢占一个 pending 任务
      */
     protected function fetchNextPendingTask(): ?Task
     {
@@ -63,7 +57,6 @@ class TaskWorkerController extends Controller
 
         $now = time();
 
-        // 用 id + status 作为条件，保证原子性
         $rows = Task::updateAll(
             [
                 'status' => 'processing',
@@ -76,41 +69,62 @@ class TaskWorkerController extends Controller
         );
 
         if ($rows === 0) {
-            // 被别的 worker 抢走了
             return null;
         }
 
-        // 抢到任务
         return $task;
     }
 
     /**
-     * 处理任务
+     * 执行任务
      */
     protected function processTask(Task $task): void
     {
-        $this->log("Processing task: {$task->id}");
+        $this->log("Processing task: {$task->id}, retry={$task->retry_count}");
 
         try {
-            // ⏳ 模拟耗时任务
+            // ⏳ 模拟耗时
             sleep(20);
 
             $task->status = 'done';
             $task->finished_at = time();
+            $task->error_message = null;
             $task->save(false);
 
             $this->log("Task finished: {$task->id}");
 
         } catch (\Throwable $e) {
 
-            $task->status = 'failed';
-            $task->error_message = $e->getMessage();
-            $task->finished_at = time();
-            $task->save(false);
-
-            Yii::error($e->getMessage(), 'task.worker');
-            $this->log("Task failed: {$task->id}, error={$e->getMessage()}");
+            $this->handleTaskFailure($task, $e->getMessage());
         }
+    }
+
+    /**
+     * 处理失败 / 重试 / 毒任务终结
+     */
+    protected function handleTaskFailure(Task $task, string $error): void
+    {
+        $task->retry_count += 1;
+        $task->error_message = $error;
+
+        if ($task->retry_count >= $task->max_retry) {
+
+            $task->status = 'failed';
+            $task->finished_at = time();
+
+            $this->log("Task poisoned & terminated: {$task->id}");
+
+        } else {
+
+            $task->status = 'pending';
+            $task->started_at = null;
+
+            $this->log("Task retry scheduled: {$task->id}, retry={$task->retry_count}");
+        }
+
+        $task->save(false);
+
+        Yii::error($error, 'task.worker');
     }
 
     /**
@@ -129,25 +143,37 @@ class TaskWorkerController extends Controller
 
         $timeoutAt = $now - $this->taskTimeout;
 
-        $count = Task::updateAll(
-            [
-                'status' => 'pending',
-                'started_at' => null,
-            ],
-            [
-                'and',
-                ['status' => 'processing'],
-                ['<', 'started_at', $timeoutAt],
-            ]
-        );
+        /** @var Task[] $tasks */
+        $tasks = Task::find()
+            ->where(['status' => 'processing'])
+            ->andWhere(['<', 'started_at', $timeoutAt])
+            ->all();
 
-        if ($count > 0) {
-            $this->log("Recovered {$count} stuck task(s)");
+        foreach ($tasks as $task) {
+
+            $task->retry_count += 1;
+
+            if ($task->retry_count >= $task->max_retry) {
+
+                $task->status = 'failed';
+                $task->finished_at = $now;
+
+                $this->log("Stuck task poisoned: {$task->id}");
+
+            } else {
+
+                $task->status = 'pending';
+                $task->started_at = null;
+
+                $this->log("Recovered stuck task: {$task->id}, retry={$task->retry_count}");
+            }
+
+            $task->save(false);
         }
     }
 
     /**
-     * ❤️ 心跳日志
+     * ❤️ 心跳
      */
     protected function heartbeat(): void
     {
@@ -165,12 +191,8 @@ class TaskWorkerController extends Controller
         }
     }
 
-    /**
-     * 日志输出
-     */
     protected function log(string $message): void
     {
-        $time = date('Y-m-d H:i:s');
-        echo "[{$time}] {$message}\n";
+        echo '[' . date('Y-m-d H:i:s') . "] {$message}\n";
     }
 }
