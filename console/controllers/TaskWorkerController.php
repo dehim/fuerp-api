@@ -41,38 +41,41 @@ class TaskWorkerController extends Controller
     }
 
     /**
-     * 原子抢占一个 pending 任务
+     * 原子抢占一个 pending 任务（原子级）
      */
     protected function fetchNextPendingTask(): ?Task
     {
-        $task = Task::find()
-            ->where(['status' => 'pending'])
-            ->orderBy(['created_at' => SORT_ASC])
-            ->limit(1)
-            ->one();
-
-        if (!$task) {
-            return null;
-        }
-
         $now = time();
+        $db = Task::getDb();
 
-        $rows = Task::updateAll(
-            [
-                'status' => 'processing',
-                'started_at' => $now,
-            ],
-            [
-                'id' => $task->id,
-                'status' => 'pending',
-            ]
-        );
+        return $db->transaction(function ($db) use ($now) {
 
-        if ($rows === 0) {
-            return null;
-        }
+            // 1️⃣ 原子更新一条 pending 任务为 processing
+            $rows = $db->createCommand("
+            UPDATE task
+            SET status = :status, started_at = :started_at
+            WHERE id = (
+                SELECT id FROM task
+                WHERE status = 'pending'
+                ORDER BY created_at ASC
+                LIMIT 1
+            )
+        ", [
+                ':status' => 'processing',
+                ':started_at' => $now,
+            ])->execute();
 
-        return $task;
+            if ($rows === 0) {
+                return null; // 没有 pending 任务
+            }
+
+            // 2️⃣ 查询刚刚抢到的任务
+            $task = Task::find()
+                ->where(['status' => 'processing', 'started_at' => $now])
+                ->one();
+
+            return $task;
+        });
     }
 
     /**
