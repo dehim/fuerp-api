@@ -18,9 +18,6 @@ class TaskWorkerController extends Controller
      */
     public function actionRun()
     {
-        $redis = Yii::$app->redis;
-        $queueKey = 'task:queue';
-
         $this->log('Task worker started...');
 
         while (true) {
@@ -28,57 +25,56 @@ class TaskWorkerController extends Controller
             // 心跳检测
             $this->heartbeat();
 
-            // 阻塞弹出任务，timeout 5秒
-            $data = $redis->brpop($queueKey, 5);
+            // 1️⃣ 查找一个 pending 任务
+            /** @var Task|null $task */
+            $task = Task::find()
+                ->where(['status' => 'pending'])
+                ->orderBy(['created_at' => SORT_ASC])
+                ->one();
 
-            // 安全检查
-            if (!$data || !is_array($data) || count($data) < 2) {
+            if (!$task) {
+                // 没任务就歇一会
+                sleep(5);
                 continue;
             }
 
-            $key = $data[0];
-            $payloadJson = $data[1];
+            // 2️⃣ 原子抢占任务
+            $rows = Task::updateAll(
+                [
+                    'status' => 'processing',
+                    'started_at' => time(),
+                ],
+                [
+                    'id' => $task->id,
+                    'status' => 'pending',
+                ]
+            );
 
-            // JSON 解码
-            $payload = json_decode($payloadJson, true);
-            $taskId = $payload['task_id'] ?? null;
-
-            if (!$taskId) {
-                $this->log("Invalid task payload: {$payloadJson}");
+            if ($rows === 0) {
+                // 被别的 worker 抢走了
                 continue;
             }
 
-            $this->processTask($taskId);
+            // 3️⃣ 真正处理任务
+            $this->processTask($task->id);
         }
     }
 
     protected function processTask(string $taskId): void
     {
-        // 原子抢任务
-        $rows = Task::updateAll(
-            [
-                'status' => 'processing',
-                'started_at' => time(),
-            ],
-            [
-                'id' => $taskId,
-                'status' => 'pending',
-            ]
-        );
-
-        if ($rows === 0) {
-            $this->log("Skip task {$taskId}, already processed or not pending");
-
-            return;
-        }
-
         $this->log("Processing task: {$taskId}");
 
         /** @var Task $task */
         $task = Task::findOne(['id' => $taskId]);
 
+        if (!$task) {
+            $this->log("Task {$taskId} not found");
+
+            return;
+        }
+
         try {
-            // ⏳ 模拟耗时
+            // ⏳ 模拟耗时任务（图片处理）
             sleep(20);
 
             $task->status = 'done';
@@ -122,5 +118,4 @@ class TaskWorkerController extends Controller
             $this->lastHeartbeatAt = $now;
         }
     }
-
 }

@@ -9,7 +9,7 @@ use yii\db\Exception;
 class TaskService
 {
     /**
-     * 创建任务并入队
+     * 创建任务
      *
      * @param array $params
      *
@@ -20,7 +20,7 @@ class TaskService
     public static function create(array $params): array
     {
         /**
-         * 1️⃣ 参数校验（第一版：够用即可）
+         * 1️⃣ 参数校验
          */
         if (empty($params['type'])) {
             throw new Exception('Task type is required');
@@ -30,7 +30,6 @@ class TaskService
             throw new Exception('Input path is required');
         }
 
-        // 可选参数
         $options = $params['options'] ?? null;
 
         /**
@@ -41,7 +40,9 @@ class TaskService
         $task->type = $params['type'];
         $task->status = 'pending';
         $task->input_path = $params['input_path'];
-        $task->options = $options ? json_encode($options, JSON_UNESCAPED_UNICODE) : null;
+        $task->options = $options
+            ? json_encode($options, JSON_UNESCAPED_UNICODE)
+            : null;
         $task->created_at = time();
 
         if (!$task->save()) {
@@ -51,19 +52,7 @@ class TaskService
         }
 
         /**
-         * 3️⃣ Redis 入队
-         */
-        $redis = Yii::$app->redis;
-
-        $payload = json_encode([
-            'task_id' => $task->id,
-            'type' => $task->type,
-        ], JSON_UNESCAPED_UNICODE);
-
-        $redis->lpush('task:queue', $payload);
-
-        /**
-         * 4️⃣ 返回结果
+         * 3️⃣ 返回结果
          */
         return [
             'task_id' => $task->id,
@@ -73,12 +62,9 @@ class TaskService
 
     /**
      * 生成 task_id
-     *
-     * @return string
      */
     protected static function generateTaskId(): string
     {
-        // 示例：32位以内，便于索引 & 人工排查
         return md5(uniqid('task_', true));
     }
 }
