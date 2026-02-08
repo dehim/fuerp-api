@@ -50,7 +50,7 @@ class TaskController extends ApiController
             /**
              * 2️⃣ 调用 Service
              */
-            $result = TaskService::create($params);
+            $result = TaskService::createBatch($params);
 
             /**
              * 3️⃣ 统一成功返回
@@ -61,7 +61,7 @@ class TaskController extends ApiController
             //     'data' => $result,
             // ];
 
-            return ApiResponse::success($result, );
+            return ApiResponse::success($result, 'tasks created');
 
         } catch (BadRequestHttpException $e) {
             throw $e;

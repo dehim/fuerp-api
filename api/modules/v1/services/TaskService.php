@@ -4,47 +4,85 @@ namespace api\modules\v1\services;
 
 use api\modules\v1\models\Task;
 use Yii;
-use yii\db\Exception;
+use yii\web\BadRequestHttpException;
 
 class TaskService
 {
-    public static function create(array $params): array
+    /**
+     * 批量创建压缩任务
+     */
+    public static function createBatch(array $params): array
     {
-        if (empty($params['type'])) {
-            throw new Exception('Task type is required');
+        $images = $params['images'] ?? [];
+        $options = $params['options'] ?? null;
+
+        if (empty($images) || !is_array($images)) {
+            throw new BadRequestHttpException('images is required');
         }
 
-        if (empty($params['input_path'])) {
-            throw new Exception('Input path is required');
+        if ($options === null) {
+            throw new BadRequestHttpException('options is required');
         }
 
-        $task = new Task();
-        $task->id = self::generateTaskId();
-        $task->type = $params['type'];
-        $task->status = 'pending';
-        $task->input_path = $params['input_path'];
-        $task->options = isset($params['options'])
-            ? json_encode($params['options'], JSON_UNESCAPED_UNICODE)
-            : null;
+        $batchId = self::generateBatchId();
+        $now = time();
 
-        $task->retry_count = 0;
-        $task->max_retry = 3;
-        $task->created_at = time();
+        $rows = [];
+        $imageIds = [];
 
-        if (!$task->save()) {
-            Yii::error($task->getErrors(), 'task.create');
+        foreach ($images as $img) {
+            if (empty($img['image_id']) || empty($img['input_path'])) {
+                throw new BadRequestHttpException('Invalid image payload');
+            }
 
-            throw new Exception('Failed to create task');
+            $rows[] = [
+                'id' => self::generateTaskId(),
+                'batch_id' => $batchId,
+                'type' => 'image_compress',
+                'status' => 'pending',
+                'image_id' => $img['image_id'],
+                'input_path' => $img['input_path'],
+                'options' => json_encode($options, JSON_UNESCAPED_UNICODE),
+                'created_at' => $now,
+                'retry_count' => 0,
+                'max_retry' => 3,
+            ];
+
+            $imageIds[] = $img['image_id'];
+        }
+
+        $db = Yii::$app->db;
+        $transaction = $db->beginTransaction();
+
+        try {
+            $db->createCommand()
+                ->batchInsert(
+                    Task::tableName(),
+                    array_keys($rows[0]),
+                    $rows
+                )
+                ->execute();
+
+            $transaction->commit();
+        } catch (\Throwable $e) {
+            $transaction->rollBack();
+
+            throw $e;
         }
 
         return [
-            'task_id' => $task->id,
-            'status' => $task->status,
+            'batch_id' => $batchId,
+            'image_ids' => $imageIds,
         ];
+    }
+
+    protected static function generateBatchId(): string
+    {
+        return 'batch_' . date('Ymd_His') . '_' . substr(md5(uniqid('', true)), 0, 6);
     }
 
     protected static function generateTaskId(): string
     {
-        return md5(uniqid('task_', true));
+        return 'task_' . substr(md5(uniqid('', true)), 0, 16);
     }
 }
