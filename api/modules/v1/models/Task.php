@@ -17,6 +17,8 @@ namespace api\modules\v1\models;
  * @property int|null $finished_at
  * @property int $retry_count
  * @property int $max_retry
+ * @property string $batch_id
+ * @property string $image_id
  */
 class Task extends \yii\db\ActiveRecord
 {
@@ -37,10 +39,10 @@ class Task extends \yii\db\ActiveRecord
             [['output_path', 'options', 'error_message', 'started_at', 'finished_at'], 'default', 'value' => null],
             [['retry_count'], 'default', 'value' => 0],
             [['max_retry'], 'default', 'value' => 3],
-            [['id', 'type', 'status', 'input_path', 'created_at'], 'required'],
+            [['id', 'batch_id', 'image_id', 'type', 'status', 'input_path', 'created_at'], 'required'],
             [['input_path', 'output_path', 'options', 'error_message'], 'string'],
             [['created_at', 'started_at', 'finished_at','retry_count','max_retry'], 'integer'],
-            [['id', 'type'], 'string', 'max' => 32],
+            [['id', 'batch_id', 'image_id', 'type'], 'string', 'max' => 32],
             [['status'], 'string', 'max' => 16],
             [['id'], 'unique'],
         ];
@@ -64,6 +66,8 @@ class Task extends \yii\db\ActiveRecord
             'finished_at' => 'Finished At',
             'retry_count' => 'Retry Count',
             'max_retry' => 'Max Retry',
+            'batch_id' => 'Batch ID',
+            'image_id' => 'Image ID',
         ];
     }
 
