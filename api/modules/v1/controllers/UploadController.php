@@ -14,6 +14,12 @@ class UploadController extends ApiController
      */
     public function actionImage()
     {
+        // ★ 1. 协议级 image_id（来自前端）
+        $imageId = Yii::$app->request->post('image_id');
+        if (empty($imageId)) {
+            throw new BadRequestHttpException('Missing image_id');
+        }
+
         $file = UploadedFile::getInstanceByName('file');
 
         if (!$file) {
@@ -24,7 +30,7 @@ class UploadController extends ApiController
             throw new BadRequestHttpException('Invalid image file');
         }
 
-        // 生成存储路径
+        // ★ 2. 生成存储路径
         $subDir = date('Y/m');
         $basePath = Yii::getAlias('@uploads/images/' . $subDir);
 
@@ -32,6 +38,7 @@ class UploadController extends ApiController
             mkdir($basePath, 0775, true);
         }
 
+        // ★ 3. 后端生成文件名（与 image_id 解耦）
         $filename = $this->generateFilename($file);
         $fullPath = $basePath . '/' . $filename;
 
@@ -40,6 +47,7 @@ class UploadController extends ApiController
         }
 
         return ApiResponse::success([
+            'image_id' => $imageId,
             'input_path' => $fullPath,
             'original_name' => $file->name,
             'size' => $file->size,
