@@ -4,5 +4,17 @@ Yii::setAlias('@common', dirname(__DIR__));
 Yii::setAlias('@frontend', dirname(dirname(__DIR__)) . '/frontend');
 Yii::setAlias('@backend', dirname(dirname(__DIR__)) . '/backend');
 Yii::setAlias('@console', dirname(dirname(__DIR__)) . '/console');
-// 定义上传文件的别名路径: 选择当前代码根目录的上两级目录下的“uploads”位置
-Yii::setAlias('@uploads', dirname(Yii::getAlias('@app'), 2) . DIRECTORY_SEPARATOR . 'uploads');
+/**
+ * 上传目录：
+ * 指向 项目根目录的上两级 /uploads
+ * 兼容 Windows / Linux
+ */
+Yii::setAlias(
+    '@uploads',
+    dirname(Yii::getAlias('@common'), 2) . DIRECTORY_SEPARATOR . 'uploads'
+);
+// 在 bootstrap 里顺便确保目录存在
+$uploadPath = Yii::getAlias('@uploads');
+if (!is_dir($uploadPath)) {
+    mkdir($uploadPath, 0775, true);
+}
