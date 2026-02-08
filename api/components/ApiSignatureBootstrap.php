@@ -12,12 +12,18 @@ class ApiSignatureBootstrap implements BootstrapInterface
         $app->on(Application::EVENT_BEFORE_REQUEST, function () use ($app) {
 
             $request = $app->request;
+            $method = $request->method ?? '';
             $path = trim($request->pathInfo, '/');
 
             $params = array_merge(
                 $request->getQueryParams(),
                 $request->getBodyParams()
             );
+
+            // 直接放行 OPTIONS 请求（预检请求）
+            if (strtoupper($method) === 'OPTIONS') {
+                return;
+            }
 
             // ====== debug 模式请求 ======
             if (isset($params['_mode']) && $params['_mode'] === 'debug') {
