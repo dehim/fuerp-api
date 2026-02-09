@@ -5,6 +5,7 @@ namespace api\modules\v1\controllers;
 use api\components\ApiCode;
 use api\components\ApiResponse;
 use api\exceptions\BusinessException;
+use api\modules\v1\controllers\base\ApiController;
 use Yii;
 
 class TestController extends ApiController

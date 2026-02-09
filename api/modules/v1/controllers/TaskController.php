@@ -3,6 +3,7 @@
 namespace api\modules\v1\controllers;
 
 use api\components\ApiResponse;
+use api\modules\v1\controllers\base\ApiController;
 use api\modules\v1\services\TaskService;
 use Yii;
 use yii\filters\VerbFilter;

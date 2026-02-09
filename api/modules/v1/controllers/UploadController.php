@@ -3,6 +3,7 @@
 namespace api\modules\v1\controllers;
 
 use api\components\ApiResponse;
+use api\modules\v1\controllers\base\ApiController;
 use Yii;
 use yii\web\BadRequestHttpException;
 use yii\web\UploadedFile;
