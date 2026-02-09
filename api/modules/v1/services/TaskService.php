@@ -76,6 +76,18 @@ class TaskService
         ];
     }
 
+    public static function buildDownloadFilename(Task $task): string
+    {
+        // 示例： image_123_compressed.jpg
+        $ext = pathinfo($task->output_path, PATHINFO_EXTENSION);
+
+        return sprintf(
+            'image_%s_compressed.%s',
+            $task->image_id,
+            $ext ?: 'jpg'
+        );
+    }
+
     protected static function generateBatchId(): string
     {
         return 'batch_' . date('Ymd_His') . '_' . substr(md5(uniqid('', true)), 0, 6);

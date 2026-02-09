@@ -4,11 +4,14 @@ namespace api\modules\v1\controllers;
 
 use api\components\ApiResponse;
 use api\modules\v1\controllers\base\ApiController;
+use api\modules\v1\models\Task;
 use api\modules\v1\services\TaskService;
 use Yii;
 use yii\filters\VerbFilter;
 use yii\web\BadRequestHttpException;
 use yii\web\HttpException;
+use yii\web\NotFoundHttpException;
+use yii\web\Response;
 
 class TaskController extends ApiController
 {
@@ -25,6 +28,7 @@ class TaskController extends ApiController
             'actions' => [
                 // actionCreate 仅允许 POST
                 'create' => ['POST'],
+                'download' => ['GET'],
             ],
         ];
 
@@ -75,5 +79,48 @@ class TaskController extends ApiController
 
             throw new HttpException(400, $e->getMessage());
         }
+    }
+
+    /**
+     * 下载任务产物（单张图片）
+     *
+     * GET /v1/task/download?id=123
+     */
+    public function actionDownload(int $id)
+    {
+        /** @var Task|null $task */
+        $task = Task::findOne($id);
+
+        if (!$task) {
+            throw new NotFoundHttpException('Task not found');
+        }
+
+        if ($task->status !== 'done') {
+            throw new BadRequestHttpException('Task is not finished');
+        }
+
+        if (empty($task->output_path)) {
+            throw new BadRequestHttpException('Output file not found');
+        }
+
+        $filePath = $task->output_path;
+
+        if (!is_file($filePath)) {
+            throw new NotFoundHttpException('File does not exist');
+        }
+
+        // ✅ 下载文件名（可定制）
+        $downloadName = TaskService::buildDownloadFilename($task);
+
+        // ⚠️ 禁用 Yii 的 response formatter
+        Yii::$app->response->format = Response::FORMAT_RAW;
+
+        return Yii::$app->response->sendFile(
+            $filePath,
+            $downloadName,
+            [
+                'inline' => false,
+            ]
+        );
     }
 }
