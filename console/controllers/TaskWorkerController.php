@@ -91,6 +91,10 @@ class TaskWorkerController extends Controller
 
             $task->status = 'done';
             $task->finished_at = time();
+            // 🎯 模拟输出路径
+            $task->output_path = dirname($task->input_path)
+                . '/compressed_' . basename($task->input_path);
+
             $task->error_message = null;
             $task->save(false);
 
