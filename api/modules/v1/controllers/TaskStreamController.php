@@ -66,6 +66,9 @@ class TaskStreamController extends ApiSseController
             'status' => $task->status,
             'progress' => $this->calcProgress($task),
 
+            'input_size' => $task->input_size,
+            'output_size' => $task->output_size,
+
             // 🎯 仅在完成时返回下载入口
             'download_url' => $task->status === 'done'
                 ? TaskService::buildDownloadPath($task)

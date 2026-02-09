@@ -89,11 +89,19 @@ class TaskWorkerController extends Controller
             // ⏳ 模拟耗时
             sleep(20);
 
+            // 🎯 模拟输出路径（暂时沿用输入路径，以检验前端生成下载路径URL签名是否正确有效）
+            $outputPath = dirname($task->input_path)
+                . '/' . basename($task->input_path);
+
+            // ✅ 计算输出大小
+            $outputSize = is_file($outputPath)
+                ? filesize($outputPath) * 0.6  // 模拟压缩后大小为原始的 60%
+                : null;
+
             $task->status = 'done';
             $task->finished_at = time();
-            // 🎯 模拟输出路径
-            $task->output_path = dirname($task->input_path)
-                . '/' . basename($task->input_path);
+            $task->output_path = $outputPath;
+            $task->output_size = $outputSize;
 
             $task->error_message = null;
             $task->save(false);

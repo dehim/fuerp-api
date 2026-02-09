@@ -31,7 +31,11 @@ class TaskService
         $imageIds = [];
 
         foreach ($images as $img) {
-            if (empty($img['image_id']) || empty($img['input_path'])) {
+            if (
+                empty($img['image_id']) ||
+                empty($img['input_path']) ||
+                !isset($img['size'])
+            ) {
                 throw new BadRequestHttpException('Invalid image payload');
             }
 
@@ -42,6 +46,7 @@ class TaskService
                 'status' => 'pending',
                 'image_id' => $img['image_id'],
                 'input_path' => $img['input_path'],
+                'input_size' => (int)$img['size'], // ✅ 原始大小
                 'options' => json_encode($options, JSON_UNESCAPED_UNICODE),
                 'created_at' => $now,
                 'retry_count' => 0,
