@@ -3,13 +3,10 @@
 namespace api\modules\v1\controllers;
 
 use api\modules\v1\models\Task;
-use Yii;
 use yii\web\BadRequestHttpException;
 
-class TaskStreamController extends ApiController
+class TaskStreamController extends ApiSseController
 {
-    public $enableCsrfValidation = false;
-
     /**
      * GET /v1/task-stream?batch_id=xxx
      */
@@ -19,30 +16,12 @@ class TaskStreamController extends ApiController
             throw new BadRequestHttpException('batch_id is required');
         }
 
-        // ⚠️ 关键：彻底绕过 Yii Response
-        $response = Yii::$app->response;
-        $response->format = \yii\web\Response::FORMAT_RAW;
-
-        $headers = $response->headers;
-        $headers->set('Content-Type', 'text/event-stream');
-        $headers->set('Cache-Control', 'no-cache');
-        $headers->set('Connection', 'keep-alive');
-        $headers->set('X-Accel-Buffering', 'no'); // nginx
-
-        // 立即发送 headers
-        $response->sendHeaders();
-
-        // 关闭 Yii 的 output buffering
-        while (ob_get_level() > 0) {
-            ob_end_flush();
-        }
-        ob_implicit_flush(true);
+        // ✅ 初始化 SSE 头，包含跨域
+        $this->initSseHeaders();
 
         $lastSnapshot = [];
 
-        // SSE 主循环
         while (!connection_aborted()) {
-
             /** @var Task[] $tasks */
             $tasks = Task::find()
                 ->where(['batch_id' => $batch_id])
@@ -50,30 +29,24 @@ class TaskStreamController extends ApiController
                 ->all();
 
             foreach ($tasks as $task) {
-
                 $snapshot = $this->buildSnapshot($task);
                 $key = $task->id;
 
-                if (!isset($lastSnapshot[$key]) ||
-                    $lastSnapshot[$key] !== $snapshot) {
-
-                    $this->sendEvent($snapshot);
+                if (!isset($lastSnapshot[$key]) || $lastSnapshot[$key] !== $snapshot) {
+                    $this->sendEvent('task_update', $snapshot);
                     $lastSnapshot[$key] = $snapshot;
                 }
             }
 
             if ($this->allTasksFinished($tasks)) {
-                $this->sendEvent([
-                    'type' => 'batch_done',
-                    'batch_id' => $batch_id,
-                ]);
+                $this->sendEvent('batch_done', ['batch_id' => $batch_id]);
                 break;
             }
 
             sleep(1);
         }
 
-        // ⚠️ 关键：直接退出，不交还给 Yii
+        // ⚠️ SSE 必须直接退出
         exit;
     }
 
@@ -100,13 +73,7 @@ class TaskStreamController extends ApiController
 
         $elapsed = time() - $task->started_at;
 
-        return min(95, intval($elapsed / 600 * 100));
-    }
-
-    protected function sendEvent(array $data): void
-    {
-        echo "data: " . json_encode($data, JSON_UNESCAPED_UNICODE) . "\n\n";
-        flush();
+        return min(95, (int)($elapsed / 600 * 100));
     }
 
     protected function allTasksFinished(array $tasks): bool
