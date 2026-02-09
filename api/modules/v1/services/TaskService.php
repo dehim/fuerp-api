@@ -88,6 +88,14 @@ class TaskService
         );
     }
 
+    /**
+     * ✅ 构建【相对】下载路径（给 SSE 用）
+     */
+    public static function buildDownloadPath(Task $task): string
+    {
+        return '/v1/task/download?id=' . $task->id;
+    }
+
     protected static function generateBatchId(): string
     {
         return 'batch_' . date('Ymd_His') . '_' . substr(md5(uniqid('', true)), 0, 6);

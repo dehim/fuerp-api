@@ -84,9 +84,9 @@ class TaskController extends ApiController
     /**
      * 下载任务产物（单张图片）
      *
-     * GET /v1/task/download?id=123
+     * GET /v1/task/download?id=task_xxx
      */
-    public function actionDownload(int $id)
+    public function actionDownload(string $id)
     {
         /** @var Task|null $task */
         $task = Task::findOne($id);

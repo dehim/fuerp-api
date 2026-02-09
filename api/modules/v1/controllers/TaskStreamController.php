@@ -4,7 +4,7 @@ namespace api\modules\v1\controllers;
 
 use api\modules\v1\controllers\base\ApiSseController;
 use api\modules\v1\models\Task;
-use Yii;
+use api\modules\v1\services\TaskService;
 use yii\web\BadRequestHttpException;
 
 class TaskStreamController extends ApiSseController
@@ -68,22 +68,11 @@ class TaskStreamController extends ApiSseController
 
             // 🎯 仅在完成时返回下载入口
             'download_url' => $task->status === 'done'
-                ? $this->buildDownloadUrl($task)
+                ? TaskService::buildDownloadPath($task)
                 : null,
 
             'error' => $task->error_message,
         ];
-    }
-
-    /**
-     * 生成“逻辑型下载地址”（不签名）
-     */
-    protected function buildDownloadUrl(Task $task): string
-    {
-        return Yii::$app->urlManager->createAbsoluteUrl([
-            '/v1/task/download',
-            'task_id' => $task->id,
-        ]);
     }
 
     /**
