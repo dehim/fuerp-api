@@ -15,70 +15,70 @@ class ImagickProcessor implements ImageProcessorInterface
     public function process(Task $task): ImageProcessResult
     {
         try {
-            echo "[DEBUG] process() entered\n";
+            // echo "[DEBUG] process() entered\n";
 
             if (!class_exists(Imagick::class)) {
                 throw new ImageProcessException('Imagick not installed');
             }
-            echo "[DEBUG] Imagick class exists\n";
+            // echo "[DEBUG] Imagick class exists\n";
 
             if (!is_file($task->input_path)) {
                 throw new ImageProcessException('Input file not found');
             }
-            echo "[DEBUG] input file exists: {$task->input_path}\n";
+            // echo "[DEBUG] input file exists: {$task->input_path}\n";
 
-            echo "[DEBUG] raw options=" . var_export($task->options, true) . "\n";
+            // echo "[DEBUG] raw options=" . var_export($task->options, true) . "\n";
             $options = ImageOptions::fromJson($task->options);
-            echo "[DEBUG] options parsed\n";
-            echo "[DEBUG] options=" . json_encode($options, JSON_UNESCAPED_SLASHES) . "\n";
+            // echo "[DEBUG] options parsed\n";
+            // echo "[DEBUG] options=" . json_encode($options, JSON_UNESCAPED_SLASHES) . "\n";
 
             $imagick = new Imagick();
-            echo "[DEBUG] Imagick object created\n";
+            // echo "[DEBUG] Imagick object created\n";
 
             $imagick->setResourceLimit(Imagick::RESOURCETYPE_MEMORY, self::MAX_MEMORY_MB);
             $imagick->setResourceLimit(Imagick::RESOURCETYPE_MAP, self::MAX_MEMORY_MB);
-            echo "[DEBUG] resource limits set\n";
+            // echo "[DEBUG] resource limits set\n";
 
             $imagick->readImage($task->input_path);
-            echo "[DEBUG] image read\n";
+            // echo "[DEBUG] image read\n";
 
             $this->guardImageSize($imagick);
-            echo "[DEBUG] image size ok\n";
+            // echo "[DEBUG] image size ok\n";
 
             if ($options->resize !== null) {
-                echo "[DEBUG] applying resize\n";
+                // echo "[DEBUG] applying resize\n";
                 $this->applyResize($imagick, $options->resize);
-                echo "[DEBUG] resize done\n";
+                // echo "[DEBUG] resize done\n";
             }
 
             if ($options->quality !== null) {
-                echo "[DEBUG] setting quality={$options->quality}\n";
+                // echo "[DEBUG] setting quality={$options->quality}\n";
                 $imagick->setImageCompressionQuality($options->quality);
-                echo "[DEBUG] quality set\n";
+                // echo "[DEBUG] quality set\n";
             }
 
             if ($options->keepExif === false) {
-                echo "[DEBUG] stripping exif\n";
+                // echo "[DEBUG] stripping exif\n";
                 $imagick->stripImage();
-                echo "[DEBUG] exif stripped\n";
+                // echo "[DEBUG] exif stripped\n";
             }
 
             $format = $options->format ?? 'original';
-            echo "[DEBUG] format={$format}\n";
+            // echo "[DEBUG] format={$format}\n";
 
             if ($format !== 'original') {
                 $imagick->setImageFormat($format);
-                echo "[DEBUG] format set\n";
+                // echo "[DEBUG] format set\n";
             }
 
             $outputPath = $this->buildOutputPath($task, $format);
-            echo "[DEBUG] outputPath={$outputPath}\n";
+            // echo "[DEBUG] outputPath={$outputPath}\n";
 
             $imagick->writeImage($outputPath);
-            echo "[DEBUG] image written\n";
+            // echo "[DEBUG] image written\n";
 
             $imagick->clear();
-            echo "[DEBUG] imagick cleared\n";
+            // echo "[DEBUG] imagick cleared\n";
 
             return new ImageProcessResult($outputPath, filesize($outputPath));
         } catch (\Throwable $e) {
@@ -98,7 +98,7 @@ class ImagickProcessor implements ImageProcessorInterface
 
         switch ($resize->mode) {
             case 'original':
-                echo "[DEBUG] 维持原尺寸\n";
+                // echo "[DEBUG] 维持原尺寸\n";
 
                 return;
 
@@ -108,7 +108,7 @@ class ImagickProcessor implements ImageProcessorInterface
                 }
                 $w = max(1, intval($resize->custom->width ?? $origW));
                 $h = max(1, intval($resize->custom->height ?? $origH));
-                echo "[DEBUG] 自定义尺寸，w={$w}, h={$h}\n";
+                // echo "[DEBUG] 自定义尺寸，w={$w}, h={$h}\n";
 
                 $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1, false);
 
@@ -123,7 +123,7 @@ class ImagickProcessor implements ImageProcessorInterface
                 $type = $pro->type ?? 'long-edge';
                 $value = $pro->value ?? max($origW, $origH);
 
-                echo "[DEBUG] 按比例缩放，原始值 w={$origW}, h={$origH}, type={$type}, value={$value}\n";
+                // echo "[DEBUG] 按比例缩放，原始值 w={$origW}, h={$origH}, type={$type}, value={$value}\n";
 
                 $w = $origW;
                 $h = $origH;
@@ -174,7 +174,7 @@ class ImagickProcessor implements ImageProcessorInterface
 
                 $w = max(1, $w);
                 $h = max(1, $h);
-                echo "[DEBUG] 按比例缩放后尺寸 w={$w}, h={$h}\n";
+                // echo "[DEBUG] 按比例缩放后尺寸 w={$w}, h={$h}\n";
 
                 $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1);
 
