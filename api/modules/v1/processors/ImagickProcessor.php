@@ -103,12 +103,10 @@ class ImagickProcessor implements ImageProcessorInterface
                 return;
 
             case 'custom':
-
                 echo "[DEBUG] 自定义尺寸，w=" . $resize->custom->width . ",h=" . $resize->custom->height . "\n";
                 $w = $resize->custom->width ?? $origW;
                 $h = $resize->custom->height ?? $origH;
 
-                // 保证尺寸大于0
                 $w = max(1, intval($w));
                 $h = max(1, intval($h));
 
@@ -117,40 +115,38 @@ class ImagickProcessor implements ImageProcessorInterface
                 return;
 
             case 'proportional':
-                echo "[DEBUG] 按比例缩放，原始值 w=" . $origW . ",h=" . $origH . "\n";
+                echo "[DEBUG] 按比例缩放，原始值 w={$origW}, h={$origH}\n";
+
+                // 注意这里使用 resize->proportional
+                $pro = $resize->proportional ?? new \stdClass();
+                $type = $pro->type ?? 'long-edge';
+                $value = $pro->value ?? max($origW, $origH);
+                echo "[DEBUG] 按比例缩放，type={$type}, value={$value}\n";
+
                 $w = $origW;
                 $h = $origH;
-                $type = $resize->proportional->type ?? 'long-edge';
-                $value = $resize->proportional->value ?? max($origW, $origH);
-                echo "[DEBUG] 按比例缩放，type=" . $type . ",value=" . $value . "\n";
 
                 if ($type === 'width') {
                     $w = intval($value);
                     $h = intval($origH * ($w / $origW));
-                    echo "[DEBUG] 按比例缩放，type=" . $type . ",w=" . $w . ", h=" . $h . "\n";
                 } elseif ($type === 'height') {
                     $h = intval($value);
                     $w = intval($origW * ($h / $origH));
-                    echo "[DEBUG] 按比例缩放，type=" . $type . ",w=" . $w . ", h=" . $h . "\n";
                 } elseif ($type === 'long-edge') {
                     if ($origW >= $origH) {
                         $w = intval($value);
                         $h = intval($origH * ($w / $origW));
-                        echo "[DEBUG] 按比例缩放，type=" . $type . ",w=" . $w . ", h=" . $h . "\n";
                     } else {
                         $h = intval($value);
                         $w = intval($origW * ($h / $origH));
-                        echo "[DEBUG] 按比例缩放，type=" . $type . ",w=" . $w . ", h=" . $h . "\n";
                     }
                 } elseif ($type === 'short-edge') {
                     if ($origW <= $origH) {
                         $w = intval($value);
                         $h = intval($origH * ($w / $origW));
-                        echo "[DEBUG] 按比例缩放，type=" . $type . ",w=" . $w . ", h=" . $h . "\n";
                     } else {
                         $h = intval($value);
                         $w = intval($origW * ($h / $origH));
-                        echo "[DEBUG] 按比例缩放，type=" . $type . ",w=" . $w . ", h=" . $h . "\n";
                     }
                 } elseif ($type === 'scale') {
                     $scale = floatval($value);
@@ -159,7 +155,6 @@ class ImagickProcessor implements ImageProcessorInterface
                     }
                     $w = intval($origW * $scale / 100);
                     $h = intval($origH * $scale / 100);
-                    echo "[DEBUG] 按比例缩放，type=" . $type . ",w=" . $w . ", h=" . $h . "\n";
                 } else {
                     throw new \RuntimeException('Unknown proportional type: ' . $type);
                 }
@@ -167,6 +162,7 @@ class ImagickProcessor implements ImageProcessorInterface
                 $w = max(1, $w);
                 $h = max(1, $h);
 
+                echo "[DEBUG] 按比例缩放后尺寸 w={$w}, h={$h}\n";
                 $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1);
 
                 return;
