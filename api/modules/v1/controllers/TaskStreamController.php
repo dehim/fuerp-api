@@ -18,10 +18,10 @@ class TaskStreamController extends ApiSseController
             throw new BadRequestHttpException('batch_id is required');
         }
 
-        // ✅ 初始化 SSE 头（含 CORS / no-buffer）
         $this->initSseHeaders();
 
         $lastSnapshot = [];
+        $sentFinal = [];
 
         while (!connection_aborted()) {
 
@@ -36,15 +36,28 @@ class TaskStreamController extends ApiSseController
                 $snapshot = $this->buildSnapshot($task);
                 $key = $task->id;
 
-                if (!isset($lastSnapshot[$key]) || $lastSnapshot[$key] !== $snapshot) {
+                $isFinal = in_array($task->status, ['done', 'failed'], true);
+
+                if (
+                    !isset($lastSnapshot[$key]) ||
+                    $lastSnapshot[$key] !== $snapshot ||
+                    ($isFinal && empty($sentFinal[$key]))
+                ) {
                     $this->sendEvent('task_update', $snapshot);
                     $lastSnapshot[$key] = $snapshot;
+
+                    if ($isFinal) {
+                        $sentFinal[$key] = true;
+                    }
                 }
             }
 
-            if ($this->allTasksFinished($tasks)) {
+            $batchStatus = $this->batchStatus($tasks);
+
+            if ($batchStatus !== 'running') {
                 $this->sendEvent('batch_done', [
                     'batch_id' => $batch_id,
+                    'status' => $batchStatus,
                 ]);
                 break;
             }
@@ -65,15 +78,11 @@ class TaskStreamController extends ApiSseController
             'image_id' => $task->image_id,
             'status' => $task->status,
             'progress' => $this->calcProgress($task),
-
             'input_size' => $task->input_size,
             'output_size' => $task->output_size,
-
-            // 🎯 仅在完成时返回下载入口
             'download_url' => $task->status === 'done'
                 ? TaskService::buildDownloadPath($task)
                 : null,
-
             'error' => $task->error_message,
         ];
     }
@@ -93,33 +102,41 @@ class TaskStreamController extends ApiSseController
             return 0;
         }
 
-        // ⏱️ 模拟任务总耗时（秒）
-        $totalSeconds = 20;
-
         $elapsed = time() - $task->started_at;
-
-        // ⛔ 防止异常值
         if ($elapsed <= 0) {
             return 0;
         }
 
-        // 📈 进度计算：最多到 95%
-        $progress = (int)floor($elapsed / $totalSeconds * 95);
-
-        return min(95, max(1, $progress));
+        return min(95, max(1, (int)floor($elapsed / 20 * 95)));
     }
 
-    /**
-     * 判断批次是否全部完成
-     */
-    protected function allTasksFinished(array $tasks): bool
+    protected function batchStatus(array $tasks): string
     {
+        if (empty($tasks)) {
+            return 'running';
+        }
+
+        $hasDone = false;
+        $hasFailed = false;
+
         foreach ($tasks as $task) {
-            if (!in_array($task->status, ['done', 'failed'], true)) {
-                return false;
+            if ($task->status === 'done') {
+                $hasDone = true;
+            } elseif ($task->status === 'failed') {
+                $hasFailed = true;
+            } else {
+                return 'running';
             }
         }
 
-        return true;
+        if ($hasDone && !$hasFailed) {
+            return 'success';
+        }
+
+        if ($hasDone && $hasFailed) {
+            return 'partial_failed';
+        }
+
+        return 'failed';
     }
 }

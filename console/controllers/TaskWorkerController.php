@@ -112,6 +112,7 @@ class TaskWorkerController extends Controller
             $task->finished_at = time();
             $task->output_path = $result->outputPath;
             $task->output_size = $result->outputSize;
+            $task->error_message = null;
 
             $task->save(false);
 
