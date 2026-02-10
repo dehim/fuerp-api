@@ -41,7 +41,7 @@ class ImageResizeOptions
             }
 
             $opt->width = (int)$c['width'];
-            $opt->height = (int)$c['height';
+            $opt->height = (int)$c['height'];
 
         } else {
             throw new BadRequestHttpException('Unknown resize mode');
