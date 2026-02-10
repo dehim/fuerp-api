@@ -98,46 +98,49 @@ class ImagickProcessor implements ImageProcessorInterface
 
         switch ($resize->mode) {
             case 'original':
-                // 原图模式，不做任何操作
                 return;
 
             case 'custom':
-                if ($resize->width !== null && $resize->height !== null) {
-                    $imagick->resizeImage($resize->width, $resize->height, Imagick::FILTER_LANCZOS, 1, true);
-                }
+                $w = $resize->custom->width ?? $origW;
+                $h = $resize->custom->height ?? $origH;
+
+                // 保证尺寸大于0
+                $w = max(1, intval($w));
+                $h = max(1, intval($h));
+
+                $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1, false);
 
                 return;
 
             case 'proportional':
                 $w = $origW;
                 $h = $origH;
-                $type = $resize->type ?? 'long-edge';
-                $value = $resize->value ?? max($origW, $origH);
+                $type = $resize->proportional->type ?? 'long-edge';
+                $value = $resize->proportional->value ?? max($origW, $origH);
 
                 if ($type === 'width') {
-                    $w = $value;
-                    $h = intval($origH * ($value / $origW));
+                    $w = intval($value);
+                    $h = intval($origH * ($w / $origW));
                 } elseif ($type === 'height') {
-                    $h = $value;
-                    $w = intval($origW * ($value / $origH));
+                    $h = intval($value);
+                    $w = intval($origW * ($h / $origH));
                 } elseif ($type === 'long-edge') {
                     if ($origW >= $origH) {
-                        $w = $value;
-                        $h = intval($origH * ($value / $origW));
+                        $w = intval($value);
+                        $h = intval($origH * ($w / $origW));
                     } else {
-                        $h = $value;
-                        $w = intval($origW * ($value / $origH));
+                        $h = intval($value);
+                        $w = intval($origW * ($h / $origH));
                     }
                 } elseif ($type === 'short-edge') {
                     if ($origW <= $origH) {
-                        $w = $value;
-                        $h = intval($origH * ($value / $origW));
+                        $w = intval($value);
+                        $h = intval($origH * ($w / $origW));
                     } else {
-                        $h = $value;
-                        $w = intval($origW * ($value / $origH));
+                        $h = intval($value);
+                        $w = intval($origW * ($h / $origH));
                     }
                 } elseif ($type === 'scale') {
-                    // 百分比缩放
                     $scale = floatval($value);
                     if ($scale <= 0) {
                         throw new \RuntimeException('Invalid scale value: ' . $value);
@@ -148,7 +151,6 @@ class ImagickProcessor implements ImageProcessorInterface
                     throw new \RuntimeException('Unknown proportional type: ' . $type);
                 }
 
-                // 保证尺寸大于0
                 $w = max(1, $w);
                 $h = max(1, $h);
 
