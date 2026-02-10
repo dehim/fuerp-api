@@ -20,17 +20,14 @@ class ImagickProcessor implements ImageProcessorInterface
             if (!class_exists(Imagick::class)) {
                 throw new ImageProcessException('Imagick not installed');
             }
-
             echo "[DEBUG] Imagick class exists\n";
 
             if (!is_file($task->input_path)) {
                 throw new ImageProcessException('Input file not found');
             }
-
             echo "[DEBUG] input file exists: {$task->input_path}\n";
 
             echo "[DEBUG] raw options=" . var_export($task->options, true) . "\n";
-
             $options = ImageOptions::fromJson($task->options);
             echo "[DEBUG] options parsed\n";
             echo "[DEBUG] options=" . json_encode($options, JSON_UNESCAPED_SLASHES) . "\n";
@@ -96,24 +93,57 @@ class ImagickProcessor implements ImageProcessorInterface
 
     private function applyResize(Imagick $imagick, $resize): void
     {
+        $origW = $imagick->getImageWidth();
+        $origH = $imagick->getImageHeight();
+
         switch ($resize->mode) {
-            case 'proportional':
-                if ($resize->type === 'width' || $resize->type === 'long-edge' || $resize->type === 'short-edge') {
-                    $w = ($resize->type === 'width') ? $resize->value : 0;
-                    $h = ($resize->type === 'height') ? $resize->value : 0;
-                    // 长边或短边等逻辑可以根据实际需求扩展
-                    $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1);
-                }
-                break;
+            case 'original':
+                // 原图模式，不做任何操作
+                return;
 
             case 'custom':
                 if ($resize->width !== null && $resize->height !== null) {
                     $imagick->resizeImage($resize->width, $resize->height, Imagick::FILTER_LANCZOS, 1, true);
                 }
-                break;
+                return;
 
-            case 'original':
-                // 原图模式，不做任何操作
+            case 'proportional':
+                $w = $origW;
+                $h = $origH;
+                $type = $resize->type ?? 'long-edge';
+                $value = $resize->value ?? max($origW, $origH);
+
+                if ($type === 'width') {
+                    $w = $value;
+                    $h = intval($origH * ($value / $origW));
+                } elseif ($type === 'height') {
+                    $h = $value;
+                    $w = intval($origW * ($value / $origH));
+                } elseif ($type === 'long-edge') {
+                    if ($origW >= $origH) {
+                        $w = $value;
+                        $h = intval($origH * ($value / $origW));
+                    } else {
+                        $h = $value;
+                        $w = intval($origW * ($value / $origH));
+                    }
+                } elseif ($type === 'short-edge') {
+                    if ($origW <= $origH) {
+                        $w = $value;
+                        $h = intval($origH * ($value / $origW));
+                    } else {
+                        $h = $value;
+                        $w = intval($origW * ($value / $origH));
+                    }
+                } else {
+                    throw new \RuntimeException('Unknown proportional type: ' . $type);
+                }
+
+                // 保证尺寸大于0
+                $w = max(1, $w);
+                $h = max(1, $h);
+
+                $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1);
                 return;
 
             default:
