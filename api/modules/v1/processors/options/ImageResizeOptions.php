@@ -6,16 +6,30 @@ use yii\web\BadRequestHttpException;
 
 class ImageResizeOptions
 {
-    public string $mode; // proportional | custom
+    public string $mode; // original | proportional | custom
 
     // proportional
-    public ?string $type = null; // width | height
+    public ?string $type = null; // width | height | long-edge | short-edge
     public ?int $value = null;
 
     // custom
     public ?int $width = null;
     public ?int $height = null;
 
+    /**
+     * 从数组构建 ImageResizeOptions
+     *
+     * 支持三种模式：
+     * - original: 保持原图尺寸
+     * - proportional: 按比例缩放
+     * - custom: 自定义宽高
+     *
+     * @param array $data
+     *
+     * @throws BadRequestHttpException
+     *
+     * @return self
+     */
     public static function fromArray(array $data): self
     {
         if (empty($data['mode'])) {
@@ -25,26 +39,35 @@ class ImageResizeOptions
         $opt = new self();
         $opt->mode = $data['mode'];
 
-        if ($opt->mode === 'proportional') {
-            $p = $data['proportional'] ?? null;
-            if (!$p || empty($p['type']) || empty($p['value'])) {
-                throw new BadRequestHttpException('Invalid proportional resize options');
-            }
+        switch ($opt->mode) {
+            case 'proportional':
+                $p = $data['proportional'] ?? null;
+                if (!$p || empty($p['type']) || empty($p['value'])) {
+                    throw new BadRequestHttpException('Invalid proportional resize options');
+                }
+                $opt->type = (string)$p['type'];
+                $opt->value = (int)$p['value'];
+                break;
 
-            $opt->type = $p['type'];
-            $opt->value = (int)$p['value'];
+            case 'custom':
+                $c = $data['custom'] ?? null;
+                if (!$c || empty($c['width']) || empty($c['height'])) {
+                    throw new BadRequestHttpException('Invalid custom resize options');
+                }
+                $opt->width = (int)$c['width'];
+                $opt->height = (int)$c['height'];
+                break;
 
-        } elseif ($opt->mode === 'custom') {
-            $c = $data['custom'] ?? null;
-            if (!$c || empty($c['width']) || empty($c['height'])) {
-                throw new BadRequestHttpException('Invalid custom resize options');
-            }
+            case 'original':
+                // 原图模式，不修改尺寸，保持默认 null
+                $opt->type = null;
+                $opt->value = null;
+                $opt->width = null;
+                $opt->height = null;
+                break;
 
-            $opt->width = (int)$c['width'];
-            $opt->height = (int)$c['height'];
-
-        } else {
-            throw new BadRequestHttpException('Unknown resize mode');
+            default:
+                throw new BadRequestHttpException('Unknown resize mode: ' . $opt->mode);
         }
 
         return $opt;
