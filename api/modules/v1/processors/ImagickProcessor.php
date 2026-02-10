@@ -9,8 +9,7 @@ use Imagick;
 
 class ImagickProcessor implements ImageProcessorInterface
 {
-    /** 安全限制 */
-    private const MAX_PIXELS = 60_000_000; // ~ 8000x8000
+    private const MAX_PIXELS = 60000000; // ~8000x8000
     private const MAX_MEMORY_MB = 256;
 
     public function process(Task $task): ImageProcessResult
@@ -35,28 +34,29 @@ class ImagickProcessor implements ImageProcessorInterface
 
         $this->guardImageSize($imagick);
 
-        // 🧠 resize
-        if (!empty($options['resize'])) {
-            $this->applyResize($imagick, $options['resize']);
+        // 🔧 resize
+        if ($options->resize !== null) {
+            $this->applyResize($imagick, $options->resize);
         }
 
         // 🎨 quality
-        if (!empty($options['quality'])) {
-            $imagick->setImageCompressionQuality((int)$options['quality']);
+        if ($options->quality !== null) {
+            $imagick->setImageCompressionQuality($options->quality);
         }
 
-        // 📦 exif
-        if (empty($options['keepExif'])) {
+        // 📦 EXIF
+        if ($options->keepExif === false) {
             $imagick->stripImage();
         }
 
         // 🖼 format
-        $format = $options['format'] ?? 'original';
+        $format = $options->format ?? 'original';
         if ($format !== 'original') {
             $imagick->setImageFormat($format);
         }
 
         $outputPath = $this->buildOutputPath($task, $format);
+
         $imagick->writeImage($outputPath);
         $imagick->clear();
 
@@ -98,6 +98,7 @@ class ImagickProcessor implements ImageProcessorInterface
     private function buildOutputPath(Task $task, string $format): string
     {
         $dir = dirname($task->input_path);
+
         $ext = $format === 'original'
             ? pathinfo($task->input_path, PATHINFO_EXTENSION)
             : $format;
