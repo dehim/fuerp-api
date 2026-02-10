@@ -8,13 +8,9 @@ class ImageResizeOptions
 {
     public string $mode; // original | proportional | custom
 
-    // proportional
-    public ?string $type = null; // width | height | long-edge | short-edge
-    public ?int $value = null;
-
-    // custom
-    public ?int $width = null;
-    public ?int $height = null;
+    // 保存原始对象，保持 proportional 和 custom 原样
+    public ?object $proportional = null;
+    public ?object $custom = null;
 
     /**
      * 从数组构建 ImageResizeOptions
@@ -41,29 +37,24 @@ class ImageResizeOptions
 
         switch ($opt->mode) {
             case 'proportional':
-                $p = $data['proportional'] ?? null;
-                if (!$p || empty($p['type']) || empty($p['value'])) {
+                if (empty($data['proportional']) || !is_array($data['proportional'])) {
                     throw new BadRequestHttpException('Invalid proportional resize options');
                 }
-                $opt->type = (string)$p['type'];
-                $opt->value = (int)$p['value'];
+                $opt->proportional = (object)$data['proportional'];
+                $opt->custom = null;
                 break;
 
             case 'custom':
-                $c = $data['custom'] ?? null;
-                if (!$c || empty($c['width']) || empty($c['height'])) {
+                if (empty($data['custom']) || !is_array($data['custom'])) {
                     throw new BadRequestHttpException('Invalid custom resize options');
                 }
-                $opt->width = (int)$c['width'];
-                $opt->height = (int)$c['height'];
+                $opt->custom = (object)$data['custom'];
+                $opt->proportional = null;
                 break;
 
             case 'original':
-                // 原图模式，不修改尺寸，保持默认 null
-                $opt->type = null;
-                $opt->value = null;
-                $opt->width = null;
-                $opt->height = null;
+                $opt->custom = null;
+                $opt->proportional = null;
                 break;
 
             default:

@@ -13,7 +13,6 @@ class ImageOptions
 
     public static function fromJson(?string $json): self
     {
-
         echo "[DEBUG] ImageOptions： json=" . $json . "\n";
 
         if (empty($json)) {
