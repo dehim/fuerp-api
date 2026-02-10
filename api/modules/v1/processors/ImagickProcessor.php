@@ -96,20 +96,28 @@ class ImagickProcessor implements ImageProcessorInterface
 
     private function applyResize(Imagick $imagick, $resize): void
     {
-        if ($resize->mode === 'proportional') {
-            if ($resize->type === 'width') {
-                $imagick->resizeImage($resize->value, 0, Imagick::FILTER_LANCZOS, 1);
-            } else {
-                $imagick->resizeImage(0, $resize->value, Imagick::FILTER_LANCZOS, 1);
-            }
-        } else {
-            $imagick->resizeImage(
-                $resize->width,
-                $resize->height,
-                Imagick::FILTER_LANCZOS,
-                1,
-                true
-            );
+        switch ($resize->mode) {
+            case 'proportional':
+                if ($resize->type === 'width' || $resize->type === 'long-edge' || $resize->type === 'short-edge') {
+                    $w = ($resize->type === 'width') ? $resize->value : 0;
+                    $h = ($resize->type === 'height') ? $resize->value : 0;
+                    // 长边或短边等逻辑可以根据实际需求扩展
+                    $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1);
+                }
+                break;
+
+            case 'custom':
+                if ($resize->width !== null && $resize->height !== null) {
+                    $imagick->resizeImage($resize->width, $resize->height, Imagick::FILTER_LANCZOS, 1, true);
+                }
+                break;
+
+            case 'original':
+                // 原图模式，不做任何操作
+                return;
+
+            default:
+                throw new \RuntimeException('Unknown resize mode: ' . $resize->mode);
         }
     }
 
