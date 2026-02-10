@@ -28,6 +28,8 @@ class ImagickProcessor implements ImageProcessorInterface
 
         echo "[DEBUG] input file exists: {$task->input_path}\n";
 
+        echo "[DEBUG] raw options=" . var_export($task->options, true) . "\n";
+
         $options = ImageOptions::fromJson($task->options);
         echo "[DEBUG] options parsed\n";
         echo "[DEBUG] options=" . json_encode($options, JSON_UNESCAPED_SLASHES) . "\n";
