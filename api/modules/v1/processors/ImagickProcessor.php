@@ -14,56 +14,73 @@ class ImagickProcessor implements ImageProcessorInterface
 
     public function process(Task $task): ImageProcessResult
     {
+        echo "[DEBUG] process() entered\n";
+
         if (!class_exists(Imagick::class)) {
             throw new ImageProcessException('Imagick not installed');
         }
+
+        echo "[DEBUG] Imagick class exists\n";
 
         if (!is_file($task->input_path)) {
             throw new ImageProcessException('Input file not found');
         }
 
+        echo "[DEBUG] input file exists: {$task->input_path}\n";
+
         $options = ImageOptions::fromJson($task->options);
+        echo "[DEBUG] options parsed\n";
+        echo "[DEBUG] options=" . json_encode($options, JSON_UNESCAPED_SLASHES) . "\n";
 
         $imagick = new Imagick();
+        echo "[DEBUG] Imagick object created\n";
 
-        // 🛡️ 资源限制（必须在 readImage 前）
         $imagick->setResourceLimit(Imagick::RESOURCETYPE_MEMORY, self::MAX_MEMORY_MB);
         $imagick->setResourceLimit(Imagick::RESOURCETYPE_MAP, self::MAX_MEMORY_MB);
+        echo "[DEBUG] resource limits set\n";
 
         $imagick->readImage($task->input_path);
+        echo "[DEBUG] image read\n";
 
         $this->guardImageSize($imagick);
+        echo "[DEBUG] image size ok\n";
 
-        // 🔧 resize
         if ($options->resize !== null) {
+            echo "[DEBUG] applying resize\n";
             $this->applyResize($imagick, $options->resize);
+            echo "[DEBUG] resize done\n";
         }
 
-        // 🎨 quality
         if ($options->quality !== null) {
+            echo "[DEBUG] setting quality={$options->quality}\n";
             $imagick->setImageCompressionQuality($options->quality);
+            echo "[DEBUG] quality set\n";
         }
 
-        // 📦 EXIF
         if ($options->keepExif === false) {
+            echo "[DEBUG] stripping exif\n";
             $imagick->stripImage();
+            echo "[DEBUG] exif stripped\n";
         }
 
-        // 🖼 format
         $format = $options->format ?? 'original';
+        echo "[DEBUG] format={$format}\n";
+
         if ($format !== 'original') {
             $imagick->setImageFormat($format);
+            echo "[DEBUG] format set\n";
         }
 
         $outputPath = $this->buildOutputPath($task, $format);
+        echo "[DEBUG] outputPath={$outputPath}\n";
 
         $imagick->writeImage($outputPath);
-        $imagick->clear();
+        echo "[DEBUG] image written\n";
 
-        return new ImageProcessResult(
-            $outputPath,
-            filesize($outputPath)
-        );
+        $imagick->clear();
+        echo "[DEBUG] imagick cleared\n";
+
+        return new ImageProcessResult($outputPath, filesize($outputPath));
     }
 
     private function applyResize(Imagick $imagick, $resize): void
