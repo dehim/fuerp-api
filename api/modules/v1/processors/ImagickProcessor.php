@@ -105,6 +105,7 @@ class ImagickProcessor implements ImageProcessorInterface
                 if ($resize->width !== null && $resize->height !== null) {
                     $imagick->resizeImage($resize->width, $resize->height, Imagick::FILTER_LANCZOS, 1, true);
                 }
+
                 return;
 
             case 'proportional':
@@ -135,6 +136,14 @@ class ImagickProcessor implements ImageProcessorInterface
                         $h = $value;
                         $w = intval($origW * ($value / $origH));
                     }
+                } elseif ($type === 'scale') {
+                    // 百分比缩放
+                    $scale = floatval($value);
+                    if ($scale <= 0) {
+                        throw new \RuntimeException('Invalid scale value: ' . $value);
+                    }
+                    $w = intval($origW * $scale / 100);
+                    $h = intval($origH * $scale / 100);
                 } else {
                     throw new \RuntimeException('Unknown proportional type: ' . $type);
                 }
@@ -144,6 +153,7 @@ class ImagickProcessor implements ImageProcessorInterface
                 $h = max(1, $h);
 
                 $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1);
+
                 return;
 
             default:
