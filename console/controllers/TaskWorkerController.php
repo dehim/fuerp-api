@@ -3,6 +3,7 @@
 namespace console\controllers;
 
 use api\modules\v1\models\Task;
+use api\modules\v1\processors\ImageProcessorInterface;
 use Yii;
 use yii\console\Controller;
 
@@ -87,23 +88,31 @@ class TaskWorkerController extends Controller
 
         try {
             // ⏳ 模拟耗时
-            sleep(20);
-
+            // sleep(20);
             // 🎯 模拟输出路径（暂时沿用输入路径，以检验前端生成下载路径URL签名是否正确有效）
-            $outputPath = dirname($task->input_path)
-                . '/' . basename($task->input_path);
+            // $outputPath = dirname($task->input_path)
+            //     . '/' . basename($task->input_path);
 
-            // ✅ 计算输出大小
-            $outputSize = is_file($outputPath)
-                ? filesize($outputPath) * 0.6  // 模拟压缩后大小为原始的 60%
-                : null;
+            // // ✅ 计算输出大小
+            // $outputSize = is_file($outputPath)
+            //     ? filesize($outputPath) * 0.6  // 模拟压缩后大小为原始的 60%
+            //     : null;
+
+            // $task->status = 'done';
+            // $task->finished_at = time();
+            // $task->output_path = $outputPath;
+            // $task->output_size = $outputSize;
+
+            // $task->error_message = null;
+
+            $processor = Yii::$container->get(ImageProcessorInterface::class);
+            $result = $processor->process($task);
 
             $task->status = 'done';
             $task->finished_at = time();
-            $task->output_path = $outputPath;
-            $task->output_size = $outputSize;
+            $task->output_path = $result->outputPath;
+            $task->output_size = $result->outputSize;
 
-            $task->error_message = null;
             $task->save(false);
 
             $this->log("Task finished: {$task->id}");

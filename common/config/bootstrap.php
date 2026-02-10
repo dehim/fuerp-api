@@ -1,5 +1,9 @@
 <?php
 
+use api\modules\v1\processors\DummyImageProcessor;
+use api\modules\v1\processors\ImageProcessorInterface;
+use api\modules\v1\processors\ImagickProcessor;
+
 Yii::setAlias('@common', dirname(__DIR__));
 Yii::setAlias('@frontend', dirname(dirname(__DIR__)) . '/frontend');
 Yii::setAlias('@backend', dirname(dirname(__DIR__)) . '/backend');
@@ -18,3 +22,14 @@ $uploadPath = Yii::getAlias('@uploads');
 if (!is_dir($uploadPath)) {
     mkdir($uploadPath, 0775, true);
 }
+
+// 注册 DI
+Yii::$container->set(ImageProcessorInterface::class, function () {
+
+    $type = Yii::$app->params['imageProcessor'] ?? 'imagick';
+
+    return match ($type) {
+        'dummy' => new DummyImageProcessor(),
+        default => new ImagickProcessor(),
+    };
+});
