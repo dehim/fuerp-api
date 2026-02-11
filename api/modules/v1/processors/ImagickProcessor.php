@@ -20,21 +20,23 @@ class ImagickProcessor implements ImageProcessorInterface
                 throw new ImageProcessException('Imagick not installed');
             }
 
-            $raw = json_decode($task->options, true);
+            $optionsRaw = json_decode($task->options, true);
 
-            if (
-                !$raw ||
-                !isset($raw['asset_snapshot']['storage_path']) ||
-                !isset($raw['process_options'])
-            ) {
-                throw new ImageProcessException("Invalid task options structure");
+            if (!$optionsRaw) {
+                throw new ImageProcessException("Task options invalid");
             }
 
-            $inputPath = $raw['asset_snapshot']['storage_path'];
-            $processOptions = $raw['process_options'];
+            $assetSnapshot = $optionsRaw['asset_snapshot'] ?? null;
+            $processOptions = $optionsRaw['process_options'] ?? null;
 
-            if (!is_file($inputPath)) {
-                throw new ImageProcessException("Input file not found: {$inputPath}");
+            if (!$assetSnapshot || !$processOptions) {
+                throw new ImageProcessException("Missing asset_snapshot or process_options");
+            }
+
+            $inputPath = $assetSnapshot['storage_path'] ?? null;
+
+            if (!$inputPath || !is_file($inputPath)) {
+                throw new ImageProcessException("Input file not found");
             }
 
             $options = ImageOptions::fromArray($processOptions);
@@ -72,11 +74,7 @@ class ImagickProcessor implements ImageProcessorInterface
                 $imagick->setImageFormat($format);
             }
 
-            $outputPath = $this->buildOutputPath(
-                $task->id,
-                $inputPath,
-                $format
-            );
+            $outputPath = $this->buildOutputPath($task, $format);
 
             $imagick->writeImage($outputPath);
             $imagick->clear();
@@ -87,36 +85,29 @@ class ImagickProcessor implements ImageProcessorInterface
             );
 
         } catch (\Throwable $e) {
-
             throw $e;
         }
     }
-
     private function applyResize(Imagick $imagick, $resize): void
     {
         $origW = $imagick->getImageWidth();
         $origH = $imagick->getImageHeight();
 
         switch ($resize->mode) {
-
             case 'original':
+                // echo "[DEBUG] 维持原尺寸\n";
+
                 return;
 
             case 'custom':
                 if (!$resize->custom) {
                     throw new \RuntimeException('Custom resize options missing');
                 }
-
                 $w = max(1, intval($resize->custom->width ?? $origW));
                 $h = max(1, intval($resize->custom->height ?? $origH));
+                // echo "[DEBUG] 自定义尺寸，w={$w}, h={$h}\n";
 
-                $imagick->resizeImage(
-                    $w,
-                    $h,
-                    Imagick::FILTER_LANCZOS,
-                    1,
-                    false
-                );
+                $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1, false);
 
                 return;
 
@@ -124,13 +115,17 @@ class ImagickProcessor implements ImageProcessorInterface
                 if (!$resize->proportional) {
                     throw new \RuntimeException('Proportional resize options missing');
                 }
-
                 $pro = $resize->proportional;
+
                 $type = $pro->type ?? 'long-edge';
                 $value = $pro->value ?? max($origW, $origH);
 
-                switch ($type) {
+                // echo "[DEBUG] 按比例缩放，原始值 w={$origW}, h={$origH}, type={$type}, value={$value}\n";
 
+                $w = $origW;
+                $h = $origH;
+
+                switch ($type) {
                     case 'width':
                         $w = intval($value);
                         $h = intval($origH * ($w / $origW));
@@ -164,30 +159,26 @@ class ImagickProcessor implements ImageProcessorInterface
                     case 'scale':
                         $scale = floatval($value);
                         if ($scale <= 0) {
-                            throw new \RuntimeException("Invalid scale");
+                            throw new \RuntimeException('Invalid scale value: ' . $value);
                         }
                         $w = intval($origW * $scale / 100);
                         $h = intval($origH * $scale / 100);
                         break;
 
                     default:
-                        throw new \RuntimeException("Unknown resize type");
+                        throw new \RuntimeException('Unknown proportional type: ' . $type);
                 }
 
                 $w = max(1, $w);
                 $h = max(1, $h);
+                // echo "[DEBUG] 按比例缩放后尺寸 w={$w}, h={$h}\n";
 
-                $imagick->resizeImage(
-                    $w,
-                    $h,
-                    Imagick::FILTER_LANCZOS,
-                    1
-                );
+                $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1);
 
                 return;
 
             default:
-                throw new \RuntimeException("Unknown resize mode");
+                throw new \RuntimeException('Unknown resize mode: ' . $resize->mode);
         }
     }
 
@@ -201,17 +192,18 @@ class ImagickProcessor implements ImageProcessorInterface
         }
     }
 
-    private function buildOutputPath(
-        string $taskId,
-        string $inputPath,
-        string $format
-    ): string {
+    private function buildOutputPath(Task $task, string $format): string
+    {
+        $optionsRaw = json_decode($task->options, true);
+        $assetSnapshot = $optionsRaw['asset_snapshot'];
+        $inputPath = $assetSnapshot['storage_path'];
+
         $dir = dirname($inputPath);
 
         $ext = $format === 'original'
             ? pathinfo($inputPath, PATHINFO_EXTENSION)
             : $format;
 
-        return $dir . '/out_' . $taskId . '.' . $ext;
+        return $dir . '/out_' . $task->id . '.' . $ext;
     }
 }

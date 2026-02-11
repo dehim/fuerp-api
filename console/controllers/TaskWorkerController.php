@@ -94,16 +94,10 @@ class TaskWorkerController extends Controller
                 throw new \RuntimeException("Task options invalid for task {$task->id}");
             }
 
-            $assetSnapshot = $options['asset_snapshot'];
-            $processOptions = $options['process_options'];
-
             // 交给 ImageProcessorInterface 处理
             $processor = Yii::$container->get(ImageProcessorInterface::class);
 
-            $resultData = $processor->process([
-                'asset_snapshot' => $assetSnapshot,
-                'process_options' => $processOptions,
-            ]);
+            $resultData = $processor->process($task);
 
             if (!isset($resultData->outputPath) || !isset($resultData->outputSize)) {
                 throw new \RuntimeException("Processor returned invalid result for task {$task->id}");
