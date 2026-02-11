@@ -11,17 +11,19 @@ class ImageOptions
     public bool $keepExif = true;
     public ?ImageResizeOptions $resize = null;
 
+    /**
+     * 从 JSON 字符串构建 ImageOptions
+     */
     public static function fromJson(?string $json): self
     {
-        // echo "[DEBUG] ImageOptions： json=" . $json . "\n";
-
         if (empty($json)) {
-            throw new BadRequestHttpException('Task options is empty');
+            throw new BadRequestHttpException('Task process_options is empty');
         }
 
         $data = json_decode($json, true);
+
         if (!is_array($data)) {
-            throw new BadRequestHttpException('Invalid options json');
+            throw new BadRequestHttpException('Invalid process_options json');
         }
 
         $opt = new self();
@@ -38,7 +40,7 @@ class ImageOptions
             $opt->keepExif = (bool)$data['keepExif'];
         }
 
-        if (!empty($data['resize'])) {
+        if (!empty($data['resize']) && is_array($data['resize'])) {
             $opt->resize = ImageResizeOptions::fromArray($data['resize']);
         }
 
