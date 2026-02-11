@@ -8,9 +8,17 @@ class DummyImageProcessor implements ImageProcessorInterface
 {
     public function process(Task $task): ImageProcessResult
     {
+        $raw = json_decode($task->options, true);
+
+        if (!$raw || !isset($raw['asset_snapshot']['storage_path'])) {
+            throw new \RuntimeException("Invalid task options");
+        }
+
+        $inputPath = $raw['asset_snapshot']['storage_path'];
+
         return new ImageProcessResult(
-            $task->input_path,
-            filesize($task->input_path)
+            $inputPath,
+            filesize($inputPath)
         );
     }
 }
