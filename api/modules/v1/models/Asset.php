@@ -7,7 +7,7 @@ use Yii;
 /**
  * This is the model class for table "asset".
  *
- * @property string|null $id
+ * @property string $id
  * @property string $type
  * @property string $storage_disk
  * @property string $storage_path
@@ -42,12 +42,19 @@ class Asset extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['id', 'storage_hash', 'original_name', 'mime_type', 'extension', 'width', 'height', 'expires_at', 'deleted_at', 'created_ip'], 'default', 'value' => null],
+            [['storage_hash', 'original_name', 'mime_type', 'extension', 'width', 'height', 'expires_at', 'deleted_at', 'created_ip'], 'default', 'value' => null],
             [['storage_disk'], 'default', 'value' => 'local'],
             [['is_temporary'], 'default', 'value' => 1],
-            [['id', 'type', 'storage_disk', 'storage_path', 'storage_hash', 'original_name', 'mime_type', 'extension', 'created_ip'], 'string'],
-            [['type', 'storage_path', 'size', 'created_at'], 'required'],
+            [['id', 'type', 'storage_path', 'size', 'created_at'], 'required'],
+            [['storage_path'], 'string'],
             [['size', 'width', 'height', 'is_temporary', 'expires_at', 'deleted_at', 'created_at'], 'integer'],
+            [['id'], 'string', 'max' => 32],
+            [['type', 'storage_disk'], 'string', 'max' => 50],
+            [['storage_hash'], 'string', 'max' => 64],
+            [['original_name'], 'string', 'max' => 255],
+            [['mime_type'], 'string', 'max' => 100],
+            [['extension'], 'string', 'max' => 20],
+            [['created_ip'], 'string', 'max' => 45],
             [['id'], 'unique'],
         ];
     }

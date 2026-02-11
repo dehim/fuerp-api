@@ -6,6 +6,7 @@ namespace api\modules\v1\models;
  * This is the model class for table "task".
  *
  * @property string $id
+ * @property string $batch_id
  * @property string $type
  * @property string $status
  * @property string|null $options
@@ -14,8 +15,8 @@ namespace api\modules\v1\models;
  * @property int $created_at
  * @property int|null $started_at
  * @property int|null $finished_at
- * @property int $retry_count
- * @property int $max_retry
+ * @property int|null $retry_count
+ * @property int|null $max_retry
  */
 class Task extends \yii\db\ActiveRecord
 {
@@ -38,12 +39,13 @@ class Task extends \yii\db\ActiveRecord
     public function rules()
     {
         return [
-            [['options', 'result', 'error_message', 'started_at', 'finished_at'], 'default', 'value' => null],
-            [['retry_count'], 'default', 'value' => 0],
-            [['max_retry'], 'default', 'value' => 3],
-            [['id', 'type', 'status', 'created_at'], 'required'],
-            [['id', 'type', 'status', 'options', 'result', 'error_message'], 'string'],
+            [['options', 'result', 'error_message', 'started_at', 'finished_at', 'retry_count', 'max_retry'], 'default', 'value' => null],
+            [['id', 'batch_id', 'type', 'status', 'created_at'], 'required'],
+            [['options', 'result', 'error_message'], 'string'],
             [['created_at', 'started_at', 'finished_at', 'retry_count', 'max_retry'], 'integer'],
+            [['id', 'type'], 'string', 'max' => 32],
+            [['batch_id'], 'string', 'max' => 64],
+            [['status'], 'string', 'max' => 16],
             [['id'], 'unique'],
         ];
     }
@@ -55,6 +57,7 @@ class Task extends \yii\db\ActiveRecord
     {
         return [
             'id' => 'ID',
+            'batch_id' => 'Batch ID',
             'type' => 'Type',
             'status' => 'Status',
             'options' => 'Options',
