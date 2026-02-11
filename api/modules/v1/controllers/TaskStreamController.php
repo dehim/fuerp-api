@@ -101,7 +101,15 @@ class TaskStreamController extends ApiSseController
      */
     protected function extractOutputSize(Task $task): ?int
     {
+        if (empty($task->result) || !is_string($task->result)) {
+            return null;
+        }
+
         $result = json_decode($task->result, true);
+
+        if (!is_array($result)) {
+            return null;
+        }
 
         return $result['output_size'] ?? null;
     }
