@@ -4,9 +4,11 @@ namespace api\modules\v1\controllers;
 
 use api\components\ApiResponse;
 use api\modules\v1\controllers\base\ApiController;
+use api\modules\v1\models\Asset;
 use api\modules\v1\models\Task;
 use api\modules\v1\services\TaskService;
 use Yii;
+use yii\db\Exception as DbException;
 use yii\filters\VerbFilter;
 use yii\web\BadRequestHttpException;
 use yii\web\HttpException;
@@ -22,11 +24,9 @@ class TaskController extends ApiController
     {
         $behaviors = parent::behaviors();
 
-        // 限制 HTTP 请求方法
         $behaviors['verbs'] = [
             'class' => VerbFilter::class,
             'actions' => [
-                // actionCreate 仅允许 POST
                 'create' => ['POST'],
                 'download' => ['GET'],
             ],
@@ -36,16 +36,13 @@ class TaskController extends ApiController
     }
 
     /**
-     * 创建任务
+     * 创建批量图片处理任务
      *
      * POST /v1/task/create
      */
     public function actionCreate()
     {
         try {
-            /**
-             * 1️⃣ 获取请求参数（支持 JSON / form-data）
-             */
             $params = Yii::$app->request->getBodyParams();
 
             if (empty($params)) {
@@ -53,24 +50,65 @@ class TaskController extends ApiController
             }
 
             /**
-             * 2️⃣ 调用 Service
+             * 1️⃣ 校验 options
              */
-            $result = TaskService::createBatch($params);
+            if (empty($params['options']) || !is_array($params['options'])) {
+                throw new BadRequestHttpException('Invalid options');
+            }
 
             /**
-             * 3️⃣ 统一成功返回
+             * 2️⃣ 校验 asset_ids
              */
-            // return [
-            //     'code' => 0,
-            //     'message' => 'ok',
-            //     'data' => $result,
-            // ];
+            if (empty($params['asset_ids']) || !is_array($params['asset_ids'])) {
+                throw new BadRequestHttpException('asset_ids must be an array');
+            }
+
+            $assetIds = array_unique($params['asset_ids']);
+
+            if (count($assetIds) === 0) {
+                throw new BadRequestHttpException('asset_ids cannot be empty');
+            }
+
+            /**
+             * 3️⃣ 查询 Asset
+             */
+            $assets = Asset::find()
+                ->where(['id' => $assetIds])
+                ->andWhere(['deleted_at' => null])
+                ->all();
+
+            if (count($assets) !== count($assetIds)) {
+                throw new BadRequestHttpException('Some assets not found or deleted');
+            }
+
+            /**
+             * 4️⃣ 过滤过期资源
+             */
+            $now = time();
+
+            foreach ($assets as $asset) {
+                if ($asset->expires_at !== null && $asset->expires_at < $now) {
+                    throw new BadRequestHttpException("Asset expired: {$asset->id}");
+                }
+
+                if (!is_file($asset->storage_path)) {
+                    throw new BadRequestHttpException("Asset file missing: {$asset->id}");
+                }
+            }
+
+            /**
+             * 5️⃣ 构建统一参数传入 Service
+             */
+            $result = TaskService::createBatchFromAssets(
+                $assets,
+                $params['options']
+            );
 
             return ApiResponse::success($result, 'tasks created');
 
         } catch (BadRequestHttpException $e) {
             throw $e;
-        } catch (\yii\db\Exception $e) {
+        } catch (DbException $e) {
             Yii::error($e->getMessage(), 'task.create');
 
             throw new HttpException(500, 'Database error');
@@ -84,43 +122,41 @@ class TaskController extends ApiController
     /**
      * 下载任务产物（单张图片）
      *
-     * GET /v1/task/download?id=task_xxx
+     * GET /v1/task/download?id=xxx
      */
     public function actionDownload(string $id)
     {
-        /** @var Task|null $task */
         $task = Task::findOne($id);
 
         if (!$task) {
             throw new NotFoundHttpException('Task not found');
         }
 
-        if ($task->status !== 'done') {
+        if ($task->status !== Task::STATUS_DONE) {
             throw new BadRequestHttpException('Task is not finished');
         }
 
-        if (empty($task->output_path)) {
+        $result = json_decode($task->result, true);
+
+        if (!$result || empty($result['output_path'])) {
             throw new BadRequestHttpException('Output file not found');
         }
 
-        $filePath = $task->output_path;
+        $filePath = $result['output_path'];
 
         if (!is_file($filePath)) {
             throw new NotFoundHttpException('File does not exist');
         }
 
-        // ✅ 下载文件名（可定制）
         $downloadName = TaskService::buildDownloadFilename($task);
 
-        // ⚠️ 禁用 Yii 的 response formatter
         Yii::$app->response->format = Response::FORMAT_RAW;
 
         return Yii::$app->response->sendFile(
             $filePath,
             $downloadName,
-            [
-                'inline' => false,
-            ]
+            ['inline' => false]
         );
     }
+
 }

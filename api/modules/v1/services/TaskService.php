@@ -2,6 +2,7 @@
 
 namespace api\modules\v1\services;
 
+use api\modules\v1\models\Asset;
 use api\modules\v1\models\Task;
 use Yii;
 use yii\web\BadRequestHttpException;
@@ -9,57 +10,71 @@ use yii\web\BadRequestHttpException;
 class TaskService
 {
     /**
-     * 批量创建压缩任务
+     * 基于 Asset 创建任务（无 batch_id）
+     *
+     * @param Asset[] $assets
+     * @param array   $options
      */
-    public static function createBatch(array $params): array
+    public static function createBatchFromAssets(array $assets, array $options): array
     {
-        $images = $params['images'] ?? [];
-        $options = $params['options'] ?? null;
-
-        if (empty($images) || !is_array($images)) {
-            throw new BadRequestHttpException('images is required');
+        if (empty($assets)) {
+            throw new BadRequestHttpException('Assets cannot be empty');
         }
 
-        if ($options === null) {
-            throw new BadRequestHttpException('options is required');
+        if (empty($options)) {
+            throw new BadRequestHttpException('Options is required');
         }
 
-        $batchId = self::generateBatchId();
         $now = time();
-
         $rows = [];
-        $imageIds = [];
+        $taskIds = [];
 
-        foreach ($images as $img) {
-            if (
-                empty($img['image_id']) ||
-                empty($img['input_path']) ||
-                !isset($img['size'])
-            ) {
-                throw new BadRequestHttpException('Invalid image payload');
+        foreach ($assets as $asset) {
+
+            if (!$asset instanceof Asset) {
+                throw new BadRequestHttpException('Invalid asset object');
             }
 
+            if ($asset->type !== 'image') {
+                throw new BadRequestHttpException("Unsupported asset type: {$asset->type}");
+            }
+
+            $taskId = self::generateTaskId();
+
+            /**
+             * 🔥 关键：
+             * 把 asset_id 放进 options
+             */
+            $taskOptions = [
+                'asset_id' => $asset->id,
+                'asset_snapshot' => [
+                    'storage_disk' => $asset->storage_disk,
+                    'storage_path' => $asset->storage_path,
+                    'size' => $asset->size,
+                    'width' => $asset->width,
+                    'height' => $asset->height,
+                ],
+                'process_options' => $options,
+            ];
+
             $rows[] = [
-                'id' => self::generateTaskId(),
-                'batch_id' => $batchId,
+                'id' => $taskId,
                 'type' => 'image_compress',
-                'status' => 'pending',
-                'image_id' => $img['image_id'],
-                'input_path' => $img['input_path'],
-                'input_size' => (int)$img['size'], // ✅ 原始大小
-                'options' => json_encode($options, JSON_UNESCAPED_UNICODE),
+                'status' => Task::STATUS_PENDING,
+                'options' => json_encode($taskOptions, JSON_UNESCAPED_UNICODE),
                 'created_at' => $now,
                 'retry_count' => 0,
                 'max_retry' => 3,
             ];
 
-            $imageIds[] = $img['image_id'];
+            $taskIds[] = $taskId;
         }
 
         $db = Yii::$app->db;
         $transaction = $db->beginTransaction();
 
         try {
+
             $db->createCommand()
                 ->batchInsert(
                     Task::tableName(),
@@ -69,6 +84,7 @@ class TaskService
                 ->execute();
 
             $transaction->commit();
+
         } catch (\Throwable $e) {
             $transaction->rollBack();
 
@@ -76,34 +92,29 @@ class TaskService
         }
 
         return [
-            'batch_id' => $batchId,
-            'image_ids' => $imageIds,
+            'task_ids' => $taskIds,
+            'total' => count($taskIds),
         ];
     }
 
     public static function buildDownloadFilename(Task $task): string
     {
-        // 示例： image_123_compressed.jpg
-        $ext = pathinfo($task->output_path, PATHINFO_EXTENSION);
+        $result = json_decode($task->result, true);
+
+        if (!$result || empty($result['output_extension'])) {
+            return 'compressed.jpg';
+        }
 
         return sprintf(
-            'image_%s_compressed.%s',
-            $task->image_id,
-            $ext ?: 'jpg'
+            'compressed_%s.%s',
+            $task->id,
+            $result['output_extension']
         );
     }
 
-    /**
-     * ✅ 构建【相对】下载路径（给 SSE 用）
-     */
     public static function buildDownloadPath(Task $task): string
     {
         return '/v1/task/download?id=' . $task->id;
-    }
-
-    protected static function generateBatchId(): string
-    {
-        return 'batch_' . date('Ymd_His') . '_' . substr(md5(uniqid('', true)), 0, 6);
     }
 
     protected static function generateTaskId(): string

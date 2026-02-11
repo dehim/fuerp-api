@@ -42,7 +42,7 @@ class TaskWorkerController extends Controller
     }
 
     /**
-     * 原子抢占一个 pending 任务（原子级）
+     * 原子抢占一个 pending 任务
      */
     protected function fetchNextPendingTask(): ?Task
     {
@@ -51,26 +51,26 @@ class TaskWorkerController extends Controller
 
         return $db->transaction(function ($db) use ($now) {
 
-            // 1️⃣ 原子更新一条 pending 任务为 processing
+            // 1️⃣ 抢占一条 pending 任务
             $rows = $db->createCommand("
-            UPDATE task
-            SET status = :status, started_at = :started_at
-            WHERE id = (
-                SELECT id FROM task
-                WHERE status = 'pending'
-                ORDER BY created_at ASC
-                LIMIT 1
-            )
-        ", [
+                UPDATE task
+                SET status = :status, started_at = :started_at
+                WHERE id = (
+                    SELECT id FROM task
+                    WHERE status = 'pending'
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                )
+            ", [
                 ':status' => 'processing',
                 ':started_at' => $now,
             ])->execute();
 
             if ($rows === 0) {
-                return null; // 没有 pending 任务
+                return null;
             }
 
-            // 2️⃣ 查询刚刚抢到的任务
+            // 2️⃣ 查询刚抢到的任务
             $task = Task::find()
                 ->where(['status' => 'processing', 'started_at' => $now])
                 ->one();
@@ -87,31 +87,36 @@ class TaskWorkerController extends Controller
         $this->log("Processing task: {$task->id}, retry={$task->retry_count}");
 
         try {
-            // ⏳ 模拟耗时
-            // sleep(20);
-            // 🎯 模拟输出路径（暂时沿用输入路径，以检验前端生成下载路径URL签名是否正确有效）
-            // $outputPath = dirname($task->input_path)
-            //     . '/' . basename($task->input_path);
+            // 解析 options
+            $options = json_decode($task->options, true);
 
-            // // ✅ 计算输出大小
-            // $outputSize = is_file($outputPath)
-            //     ? filesize($outputPath) * 0.6  // 模拟压缩后大小为原始的 60%
-            //     : null;
+            if (!$options || !isset($options['asset_snapshot'])) {
+                throw new \RuntimeException("Task options invalid for task {$task->id}");
+            }
 
-            // $task->status = 'done';
-            // $task->finished_at = time();
-            // $task->output_path = $outputPath;
-            // $task->output_size = $outputSize;
+            $assetSnapshot = $options['asset_snapshot'];
+            $processOptions = $options['process_options'];
 
-            // $task->error_message = null;
-
+            // 交给 ImageProcessorInterface 处理
             $processor = Yii::$container->get(ImageProcessorInterface::class);
-            $result = $processor->process($task);
 
-            $task->status = 'done';
+            $resultData = $processor->process([
+                'asset_snapshot' => $assetSnapshot,
+                'process_options' => $processOptions,
+            ]);
+
+            if (!isset($resultData->outputPath) || !isset($resultData->outputSize)) {
+                throw new \RuntimeException("Processor returned invalid result for task {$task->id}");
+            }
+
+            // 将结果写入 result
+            $task->status = Task::STATUS_DONE;
             $task->finished_at = time();
-            $task->output_path = $result->outputPath;
-            $task->output_size = $result->outputSize;
+            $task->result = json_encode([
+                'output_path' => $resultData->outputPath,
+                'output_size' => $resultData->outputSize,
+                'output_extension' => pathinfo($resultData->outputPath, PATHINFO_EXTENSION),
+            ], JSON_UNESCAPED_UNICODE);
             $task->error_message = null;
 
             $task->save(false);
@@ -119,7 +124,6 @@ class TaskWorkerController extends Controller
             $this->log("Task finished: {$task->id}");
 
         } catch (\Throwable $e) {
-
             $this->handleTaskFailure($task, $e->getMessage());
         }
     }
@@ -134,14 +138,14 @@ class TaskWorkerController extends Controller
 
         if ($task->retry_count >= $task->max_retry) {
 
-            $task->status = 'failed';
+            $task->status = Task::STATUS_FAILED;
             $task->finished_at = time();
 
             $this->log("Task poisoned & terminated: {$task->id}");
 
         } else {
 
-            $task->status = 'pending';
+            $task->status = Task::STATUS_PENDING;
             $task->started_at = null;
 
             $this->log("Task retry scheduled: {$task->id}, retry={$task->retry_count}");
@@ -170,7 +174,7 @@ class TaskWorkerController extends Controller
 
         /** @var Task[] $tasks */
         $tasks = Task::find()
-            ->where(['status' => 'processing'])
+            ->where(['status' => Task::STATUS_PROCESSING])
             ->andWhere(['<', 'started_at', $timeoutAt])
             ->all();
 
@@ -180,14 +184,14 @@ class TaskWorkerController extends Controller
 
             if ($task->retry_count >= $task->max_retry) {
 
-                $task->status = 'failed';
+                $task->status = Task::STATUS_FAILED;
                 $task->finished_at = $now;
 
                 $this->log("Stuck task poisoned: {$task->id}");
 
             } else {
 
-                $task->status = 'pending';
+                $task->status = Task::STATUS_PENDING;
                 $task->started_at = null;
 
                 $this->log("Recovered stuck task: {$task->id}, retry={$task->retry_count}");
