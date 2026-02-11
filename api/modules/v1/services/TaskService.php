@@ -10,7 +10,7 @@ use yii\web\BadRequestHttpException;
 class TaskService
 {
     /**
-     * 基于 Asset 创建任务（无 batch_id）
+     * 基于 Asset 创建批量任务（统一 batch_id）
      *
      * @param Asset[] $assets
      * @param array   $options
@@ -25,6 +25,7 @@ class TaskService
             throw new BadRequestHttpException('Options is required');
         }
 
+        $batchId = self::generateBatchId();
         $now = time();
         $rows = [];
         $taskIds = [];
@@ -41,10 +42,6 @@ class TaskService
 
             $taskId = self::generateTaskId();
 
-            /**
-             * 🔥 关键：
-             * 把 asset_id 放进 options
-             */
             $taskOptions = [
                 'asset_id' => $asset->id,
                 'asset_snapshot' => [
@@ -59,6 +56,7 @@ class TaskService
 
             $rows[] = [
                 'id' => $taskId,
+                'batch_id' => $batchId, // ✅ 核心升级
                 'type' => 'image_compress',
                 'status' => Task::STATUS_PENDING,
                 'options' => json_encode($taskOptions, JSON_UNESCAPED_UNICODE),
@@ -92,11 +90,15 @@ class TaskService
         }
 
         return [
+            'batch_id' => $batchId,
             'task_ids' => $taskIds,
             'total' => count($taskIds),
         ];
     }
 
+    /**
+     * 下载文件名
+     */
     public static function buildDownloadFilename(Task $task): string
     {
         $result = json_decode($task->result, true);
@@ -112,9 +114,17 @@ class TaskService
         );
     }
 
+    /**
+     * 下载路径
+     */
     public static function buildDownloadPath(Task $task): string
     {
         return '/v1/task/download?id=' . $task->id;
+    }
+
+    protected static function generateBatchId(): string
+    {
+        return 'batch_' . date('Ymd_His') . '_' . substr(md5(uniqid('', true)), 0, 6);
     }
 
     protected static function generateTaskId(): string

@@ -27,7 +27,7 @@ class TaskStreamController extends ApiSseController
 
             /** @var Task[] $tasks */
             $tasks = Task::find()
-                ->where(['batch_id' => $batch_id])
+                ->where(['batch_id' => $batch_id]) // ✅ 直接走索引
                 ->orderBy(['created_at' => SORT_ASC])
                 ->all();
 
@@ -36,7 +36,10 @@ class TaskStreamController extends ApiSseController
                 $snapshot = $this->buildSnapshot($task);
                 $key = $task->id;
 
-                $isFinal = in_array($task->status, ['done', 'failed'], true);
+                $isFinal = in_array($task->status, [
+                    Task::STATUS_DONE,
+                    Task::STATUS_FAILED,
+                ], true);
 
                 if (
                     !isset($lastSnapshot[$key]) ||
@@ -55,17 +58,18 @@ class TaskStreamController extends ApiSseController
             $batchStatus = $this->batchStatus($tasks);
 
             if ($batchStatus !== 'running') {
+
                 $this->sendEvent('batch_done', [
                     'batch_id' => $batch_id,
                     'status' => $batchStatus,
                 ]);
+
                 break;
             }
 
             sleep(1);
         }
 
-        // ⚠️ SSE 请求必须直接退出
         exit;
     }
 
@@ -74,13 +78,18 @@ class TaskStreamController extends ApiSseController
      */
     protected function buildSnapshot(Task $task): array
     {
+        $options = json_decode($task->options, true);
+        $assetId = $options['asset_id'] ?? null;
+        $snapshot = $options['asset_snapshot'] ?? [];
+
         return [
-            'image_id' => $task->image_id,
+            'task_id' => $task->id,
+            'asset_id' => $assetId,
             'status' => $task->status,
             'progress' => $this->calcProgress($task),
-            'input_size' => $task->input_size,
-            'output_size' => $task->output_size,
-            'download_url' => $task->status === 'done'
+            'input_size' => $snapshot['size'] ?? null,
+            'output_size' => $this->extractOutputSize($task),
+            'download_url' => $task->status === Task::STATUS_DONE
                 ? TaskService::buildDownloadPath($task)
                 : null,
             'error' => $task->error_message,
@@ -88,21 +97,30 @@ class TaskStreamController extends ApiSseController
     }
 
     /**
-     * 模拟进度计算
+     * 提取输出大小
+     */
+    protected function extractOutputSize(Task $task): ?int
+    {
+        $result = json_decode($task->result, true);
+
+        return $result['output_size'] ?? null;
+    }
+
+    /**
+     * 进度计算
      */
     protected function calcProgress(Task $task): int
     {
-        // ✅ 已完成：直接 100%
-        if ($task->status === 'done') {
+        if ($task->status === Task::STATUS_DONE) {
             return 100;
         }
 
-        // ❌ 非处理中 or 未开始
-        if ($task->status !== 'processing' || !$task->started_at) {
+        if ($task->status !== Task::STATUS_PROCESSING || !$task->started_at) {
             return 0;
         }
 
         $elapsed = time() - $task->started_at;
+
         if ($elapsed <= 0) {
             return 0;
         }
@@ -110,6 +128,9 @@ class TaskStreamController extends ApiSseController
         return min(95, max(1, (int)floor($elapsed / 20 * 95)));
     }
 
+    /**
+     * 批次状态
+     */
     protected function batchStatus(array $tasks): string
     {
         if (empty($tasks)) {
@@ -120,9 +141,10 @@ class TaskStreamController extends ApiSseController
         $hasFailed = false;
 
         foreach ($tasks as $task) {
-            if ($task->status === 'done') {
+
+            if ($task->status === Task::STATUS_DONE) {
                 $hasDone = true;
-            } elseif ($task->status === 'failed') {
+            } elseif ($task->status === Task::STATUS_FAILED) {
                 $hasFailed = true;
             } else {
                 return 'running';
