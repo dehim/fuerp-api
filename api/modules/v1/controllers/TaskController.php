@@ -29,6 +29,7 @@ class TaskController extends ApiController
             'actions' => [
                 'create' => ['POST'],
                 'download' => ['GET'],
+                'create-pack' => ['POST'],
             ],
         ];
 
@@ -157,6 +158,55 @@ class TaskController extends ApiController
             $downloadName,
             ['inline' => false]
         );
+    }
+
+    /**
+ * 创建打包任务
+ *
+ * POST /v1/task/create-pack
+ */
+    public function actionCreatePack()
+    {
+        $params = Yii::$app->request->getBodyParams();
+
+        $sourceBatchId = $params['source_batch_id'] ?? null;
+
+        if (!$sourceBatchId) {
+            throw new BadRequestHttpException('source_batch_id required');
+        }
+
+        // 校验是否存在已完成任务
+        $exists = Task::find()
+            ->where([
+                'batch_id' => $sourceBatchId,
+                'type' => Task::TYPE_COMPRESS,
+            ])
+            ->exists();
+
+        if (!$exists) {
+            throw new BadRequestHttpException('Invalid source batch');
+        }
+
+        $batchId = uniqid('pack_');
+
+        $task = new Task();
+        $task->id = uniqid('task_');
+        $task->batch_id = $batchId;
+        $task->type = Task::TYPE_PACK;
+        $task->status = Task::STATUS_PENDING;
+        $task->options = json_encode([
+            'source_batch_id' => $sourceBatchId,
+        ]);
+        $task->created_at = time();
+
+        if (!$task->save()) {
+            throw new HttpException(500, 'Create pack task failed');
+        }
+
+        return ApiResponse::success([
+            'batch_id' => $batchId,
+            'task_id' => $task->id,
+        ]);
     }
 
 }

@@ -3,7 +3,6 @@
 namespace console\controllers;
 
 use api\modules\v1\models\Task;
-use api\modules\v1\processors\ImageProcessorInterface;
 use Yii;
 use yii\console\Controller;
 
@@ -51,7 +50,6 @@ class TaskWorkerController extends Controller
 
         return $db->transaction(function ($db) use ($now) {
 
-            // 1️⃣ 抢占一条 pending 任务
             $rows = $db->createCommand("
                 UPDATE task
                 SET status = :status, started_at = :started_at
@@ -62,7 +60,7 @@ class TaskWorkerController extends Controller
                     LIMIT 1
                 )
             ", [
-                ':status' => 'processing',
+                ':status' => Task::STATUS_PROCESSING,
                 ':started_at' => $now,
             ])->execute();
 
@@ -70,12 +68,12 @@ class TaskWorkerController extends Controller
                 return null;
             }
 
-            // 2️⃣ 查询刚抢到的任务
-            $task = Task::find()
-                ->where(['status' => 'processing', 'started_at' => $now])
+            return Task::find()
+                ->where([
+                    'status' => Task::STATUS_PROCESSING,
+                    'started_at' => $now,
+                ])
                 ->one();
-
-            return $task;
         });
     }
 
@@ -84,26 +82,36 @@ class TaskWorkerController extends Controller
      */
     protected function processTask(Task $task): void
     {
-        $this->log("Processing task: {$task->id}, retry={$task->retry_count}");
+        $this->log("Processing task: {$task->id}, type={$task->type}, retry={$task->retry_count}");
 
         try {
-            // 解析 options
+
             $options = json_decode($task->options, true);
 
-            if (!$options || !isset($options['asset_snapshot'])) {
+            if (!is_array($options)) {
                 throw new \RuntimeException("Task options invalid for task {$task->id}");
             }
 
-            // 交给 ImageProcessorInterface 处理
-            $processor = Yii::$container->get(ImageProcessorInterface::class);
+            /**
+             * 🎯 根据任务类型选择 Processor
+             */
+            $processor = $this->resolveProcessor($task);
 
+            /**
+             * 🎯 执行处理
+             */
             $resultData = $processor->process($task);
 
-            if (!isset($resultData->outputPath) || !isset($resultData->outputSize)) {
+            if (
+                !isset($resultData->outputPath) ||
+                !isset($resultData->outputSize)
+            ) {
                 throw new \RuntimeException("Processor returned invalid result for task {$task->id}");
             }
 
-            // 将结果写入 result
+            /**
+             * 🎯 写入成功结果
+             */
             $task->status = Task::STATUS_DONE;
             $task->finished_at = time();
             $task->result = json_encode([
@@ -120,6 +128,20 @@ class TaskWorkerController extends Controller
         } catch (\Throwable $e) {
             $this->handleTaskFailure($task, $e->getMessage());
         }
+    }
+
+    /**
+     * 🔥 根据任务类型解析 Processor
+     */
+    protected function resolveProcessor(Task $task)
+    {
+        $map = Yii::$container->get('processor.map');
+
+        if (!isset($map[$task->type])) {
+            throw new \RuntimeException("Unknown task type: {$task->type}");
+        }
+
+        return Yii::$container->get($map[$task->type]);
     }
 
     /**
@@ -166,7 +188,6 @@ class TaskWorkerController extends Controller
 
         $timeoutAt = $now - $this->taskTimeout;
 
-        /** @var Task[] $tasks */
         $tasks = Task::find()
             ->where(['status' => Task::STATUS_PROCESSING])
             ->andWhere(['<', 'started_at', $timeoutAt])
