@@ -24,7 +24,7 @@ class ZipPackProcessor implements ImageProcessorInterface
             ->where([
                 'batch_id' => $sourceBatchId,
                 'status' => TaskModel::STATUS_DONE,
-                'type' => TaskModel::TYPE_COMPRESS,
+                'type' => TaskModel::TYPE_IMAGE_COMPRESS,
             ])
             ->all();
 

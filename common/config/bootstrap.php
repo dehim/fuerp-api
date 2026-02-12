@@ -24,7 +24,7 @@ if (!is_dir($uploadPath)) {
  */
 Yii::$container->set('processor.map', function () {
     return [
-        Task::TYPE_COMPRESS => ImagickProcessor::class,
-        Task::TYPE_PACK => ZipPackProcessor::class,
+        Task::TYPE_IMAGE_COMPRESS => ImagickProcessor::class,
+        Task::TYPE_BATCH_PACK => ZipPackProcessor::class,
     ];
 });

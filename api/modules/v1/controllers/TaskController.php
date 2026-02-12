@@ -179,7 +179,7 @@ class TaskController extends ApiController
         $exists = Task::find()
             ->where([
                 'batch_id' => $sourceBatchId,
-                'type' => Task::TYPE_COMPRESS,
+                'type' => Task::TYPE_IMAGE_COMPRESS,
             ])
             ->exists();
 
@@ -192,7 +192,7 @@ class TaskController extends ApiController
         $task = new Task();
         $task->id = uniqid('task_');
         $task->batch_id = $batchId;
-        $task->type = Task::TYPE_PACK;
+        $task->type = Task::TYPE_BATCH_PACK;
         $task->status = Task::STATUS_PENDING;
         $task->options = json_encode([
             'source_batch_id' => $sourceBatchId,

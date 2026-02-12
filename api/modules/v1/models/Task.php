@@ -25,8 +25,10 @@ class Task extends \yii\db\ActiveRecord
     public const STATUS_DONE = 'done';
     public const STATUS_FAILED = 'failed';
 
-    public const TYPE_COMPRESS = 'compress';
-    public const TYPE_PACK = 'pack';
+    // public const TYPE_COMPRESS = 'compress';
+    // public const TYPE_PACK = 'pack';
+    public const TYPE_IMAGE_COMPRESS = 'image_compress';
+    public const TYPE_BATCH_PACK = 'batch_pack';
 
     /**
      * {@inheritdoc}
