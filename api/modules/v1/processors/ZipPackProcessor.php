@@ -4,6 +4,7 @@ namespace api\modules\v1\processors;
 
 use api\modules\v1\models\Task;
 use api\modules\v1\models\Task as TaskModel;
+use api\modules\v1\services\TaskService;
 use Yii;
 use ZipArchive;
 
@@ -44,8 +45,6 @@ class ZipPackProcessor implements ImageProcessorInterface
             throw new \RuntimeException('Cannot create zip');
         }
 
-        $totalSize = 0;
-
         foreach ($tasks as $item) {
 
             $result = json_decode($item->result, true);
@@ -56,8 +55,10 @@ class ZipPackProcessor implements ImageProcessorInterface
                 continue;
             }
 
-            $zip->addFile($filePath, basename($filePath));
-            $totalSize += filesize($filePath);
+            // ✅ 关键修改：使用统一命名规则
+            $filenameInZip = TaskService::buildDownloadFilename($item);
+
+            $zip->addFile($filePath, $filenameInZip);
         }
 
         $zip->close();
@@ -66,6 +67,5 @@ class ZipPackProcessor implements ImageProcessorInterface
             $zipPath,
             filesize($zipPath)
         );
-
     }
 }

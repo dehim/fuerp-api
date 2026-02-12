@@ -137,10 +137,6 @@ class TaskController extends ApiController
             throw new BadRequestHttpException('Task is not finished');
         }
 
-        if ($task->type !== Task::TYPE_IMAGE_COMPRESS) {
-            throw new BadRequestHttpException('Invalid task type for single download');
-        }
-
         $result = json_decode($task->result, true);
 
         if (!$result || empty($result['output_path'])) {
@@ -153,15 +149,33 @@ class TaskController extends ApiController
             throw new NotFoundHttpException('File does not exist');
         }
 
-        $downloadName = TaskService::buildDownloadFilename($task);
-
         Yii::$app->response->format = Response::FORMAT_RAW;
 
-        return Yii::$app->response->sendFile(
-            $filePath,
-            $downloadName,
-            ['inline' => false]
-        );
+        // ✅ 单图下载
+        if ($task->type === Task::TYPE_IMAGE_COMPRESS) {
+
+            $downloadName = TaskService::buildDownloadFilename($task);
+
+            return Yii::$app->response->sendFile(
+                $filePath,
+                $downloadName,
+                ['inline' => false]
+            );
+        }
+
+        // ✅ ZIP 下载
+        if ($task->type === Task::TYPE_BATCH_PACK) {
+
+            $downloadName = 'images_compressed_' . date('Ymd_His') . '.zip';
+
+            return Yii::$app->response->sendFile(
+                $filePath,
+                $downloadName,
+                ['inline' => false]
+            );
+        }
+
+        throw new BadRequestHttpException('Unsupported task type');
     }
 
     /**
