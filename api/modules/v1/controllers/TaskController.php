@@ -216,6 +216,8 @@ class TaskController extends ApiController
             'source_batch_id' => $sourceBatchId,
         ]);
         $task->created_at = time();
+        $task->retry_count = 0;
+        $task->max_retry = 3;
 
         if (!$task->save()) {
             throw new HttpException(500, 'Create pack task failed');
