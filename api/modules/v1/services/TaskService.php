@@ -50,6 +50,7 @@ class TaskService
                     'size' => $asset->size,
                     'width' => $asset->width,
                     'height' => $asset->height,
+                    'original_name' => $asset->original_name,
                 ],
                 'process_options' => $options,
             ];
@@ -97,21 +98,55 @@ class TaskService
     }
 
     /**
-     * 下载文件名
+     * ✅ 构建下载文件名
+     * 原文件名 + _compressed + 扩展名
      */
     public static function buildDownloadFilename(Task $task): string
     {
         $result = json_decode($task->result, true);
+        $options = json_decode($task->options, true);
 
         if (!$result || empty($result['output_extension'])) {
             return 'compressed.jpg';
         }
 
+        $extension = $result['output_extension'];
+
+        $originalName = $options['asset_snapshot']['original_name'] ?? null;
+
+        if (!$originalName) {
+            return sprintf(
+                'compressed_%s.%s',
+                $task->id,
+                $extension
+            );
+        }
+
+        // 去掉原扩展名
+        $baseName = pathinfo($originalName, PATHINFO_FILENAME);
+
+        // 文件名安全过滤（防止奇怪字符）
+        $baseName = self::sanitizeFilename($baseName);
+
         return sprintf(
-            'compressed_%s.%s',
-            $task->id,
-            $result['output_extension']
+            '%s_compressed.%s',
+            $baseName,
+            $extension
         );
+    }
+
+    /**
+     * 文件名安全处理
+     */
+    protected static function sanitizeFilename(string $name): string
+    {
+        // 去除非法字符
+        $name = preg_replace('/[^\pL\pN\-_]/u', '_', $name);
+
+        // 避免连续下划线
+        $name = preg_replace('/_+/', '_', $name);
+
+        return trim($name, '_');
     }
 
     /**

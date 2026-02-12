@@ -137,6 +137,10 @@ class TaskController extends ApiController
             throw new BadRequestHttpException('Task is not finished');
         }
 
+        if ($task->type !== Task::TYPE_IMAGE_COMPRESS) {
+            throw new BadRequestHttpException('Invalid task type for single download');
+        }
+
         $result = json_decode($task->result, true);
 
         if (!$result || empty($result['output_path'])) {
