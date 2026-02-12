@@ -20,7 +20,6 @@ class ZipPackProcessor implements ImageProcessorInterface
             throw new \RuntimeException('source_batch_id missing');
         }
 
-        // 查询源批次已完成任务
         $tasks = TaskModel::find()
             ->where([
                 'batch_id' => $sourceBatchId,
@@ -45,20 +44,24 @@ class ZipPackProcessor implements ImageProcessorInterface
             throw new \RuntimeException('Cannot create zip');
         }
 
+        $usedNames = [];
+
         foreach ($tasks as $item) {
 
             $result = json_decode($item->result, true);
-
             $filePath = $result['output_path'] ?? null;
 
             if (!$filePath || !is_file($filePath)) {
                 continue;
             }
 
-            // ✅ 关键修改：使用统一命名规则
-            $filenameInZip = TaskService::buildDownloadFilename($item);
+            // 原始目标文件名
+            $baseFilename = TaskService::buildDownloadFilename($item);
 
-            $zip->addFile($filePath, $filenameInZip);
+            // 处理重复
+            $finalFilename = $this->resolveDuplicateName($baseFilename, $usedNames);
+
+            $zip->addFile($filePath, $finalFilename);
         }
 
         $zip->close();
@@ -67,5 +70,32 @@ class ZipPackProcessor implements ImageProcessorInterface
             $zipPath,
             filesize($zipPath)
         );
+    }
+
+    /**
+     * 自动处理 ZIP 内重复文件名
+     */
+    protected function resolveDuplicateName(string $filename, array &$usedNames): string
+    {
+        if (!isset($usedNames[$filename])) {
+            $usedNames[$filename] = 1;
+
+            return $filename;
+        }
+
+        $usedNames[$filename]++;
+
+        $extension = pathinfo($filename, PATHINFO_EXTENSION);
+        $baseName = pathinfo($filename, PATHINFO_FILENAME);
+
+        $newName = sprintf(
+            '%s_%d.%s',
+            $baseName,
+            $usedNames[$filename],
+            $extension
+        );
+
+        // 递归防止极端冲突
+        return $this->resolveDuplicateName($newName, $usedNames);
     }
 }
