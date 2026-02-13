@@ -37,7 +37,6 @@ class ImagickProcessor implements ImageProcessorInterface
             throw new ImageProcessException('Input file not found');
         }
 
-        // ⭐ 统一交给 ImageOptions 解析
         $imageOptions = ImageOptions::fromJson(
             json_encode($processOptions, JSON_UNESCAPED_UNICODE)
         );
@@ -57,26 +56,36 @@ class ImagickProcessor implements ImageProcessorInterface
 
         $this->guardImageSize($imagick);
 
+        // =============================
         // resize
+        // =============================
         if ($imageOptions->resize !== null) {
             $this->applyResize($imagick, $imageOptions->resize);
         }
 
-        // quality
-        if ($imageOptions->quality !== null) {
-            $imagick->setImageCompressionQuality($imageOptions->quality);
-        }
-
-        // exif
-        if ($imageOptions->keepExif === false) {
-            $imagick->stripImage();
-        }
-
+        // =============================
         // format
+        // =============================
         $format = $imageOptions->format ?? 'original';
 
         if ($format !== 'original') {
             $imagick->setImageFormat($format);
+        }
+
+        $finalFormat = strtolower($imagick->getImageFormat());
+
+        // =============================
+        // compression / quality
+        // =============================
+        if ($imageOptions->quality !== null) {
+            $this->applyQuality($imagick, $imageOptions->quality, $finalFormat);
+        }
+
+        // =============================
+        // exif
+        // =============================
+        if ($imageOptions->keepExif === false) {
+            $imagick->stripImage();
         }
 
         $outputPath = $this->buildOutputPath($task, $inputPath, $format);
@@ -88,6 +97,45 @@ class ImagickProcessor implements ImageProcessorInterface
             $outputPath,
             filesize($outputPath)
         );
+    }
+
+    private function applyQuality(Imagick $imagick, int $quality, string $format): void
+    {
+        $quality = max(1, min(100, $quality));
+
+        switch ($format) {
+
+            // =============================
+            // JPEG
+            // =============================
+            case 'jpeg':
+            case 'jpg':
+                $imagick->setImageCompression(Imagick::COMPRESSION_JPEG);
+                $imagick->setImageCompressionQuality($quality);
+                break;
+
+                // =============================
+                // WEBP
+                // =============================
+            case 'webp':
+                $imagick->setImageCompressionQuality($quality);
+                break;
+
+                // =============================
+                // PNG
+                // =============================
+            case 'png':
+                // PNG 是无损压缩，质量转换为压缩级别 0-9
+                $level = (int)round((100 - $quality) / 100 * 9);
+                $imagick->setImageCompression(Imagick::COMPRESSION_ZIP);
+                $imagick->setOption('png:compression-level', (string)$level);
+                break;
+
+            default:
+                // 其他格式默认尝试设置
+                $imagick->setImageCompressionQuality($quality);
+                break;
+        }
     }
 
     private function applyResize(Imagick $imagick, $resize): void
@@ -103,20 +151,14 @@ class ImagickProcessor implements ImageProcessorInterface
             case 'custom':
                 $w = max(1, intval($resize->custom->width ?? $origW));
                 $h = max(1, intval($resize->custom->height ?? $origH));
-                $imagick->resizeImage($w, $h, Imagick::FILTER_LANCZOS, 1);
-
-                return;
+                break;
 
             case 'proportional':
                 $pro = $resize->proportional;
                 $type = $pro->type ?? 'long-edge';
                 $value = $pro->value ?? max($origW, $origH);
 
-                $w = $origW;
-                $h = $origH;
-
                 switch ($type) {
-
                     case 'width':
                         $w = intval($value);
                         $h = intval($origH * ($w / $origW));
@@ -160,18 +202,18 @@ class ImagickProcessor implements ImageProcessorInterface
                         throw new ImageProcessException('Unknown proportional type');
                 }
 
-                $imagick->resizeImage(
-                    max(1, $w),
-                    max(1, $h),
-                    Imagick::FILTER_LANCZOS,
-                    1
-                );
-
-                return;
+                break;
 
             default:
                 throw new ImageProcessException('Unknown resize mode');
         }
+
+        $imagick->resizeImage(
+            max(1, $w),
+            max(1, $h),
+            Imagick::FILTER_LANCZOS,
+            1
+        );
     }
 
     private function guardImageSize(Imagick $imagick): void
