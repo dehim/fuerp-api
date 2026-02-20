@@ -51,14 +51,32 @@ class TaskController extends ApiController
             }
 
             /**
-             * 1️⃣ 校验 options
+             * 1️⃣ 校验 type
+             */
+            $type = $params['type'] ?? null;
+
+            if (!$type) {
+                throw new BadRequestHttpException('Task type is required');
+            }
+
+            $allowedTypes = [
+                Task::TYPE_IMAGE_COMPRESS,
+                Task::TYPE_IMAGE_CROP,
+            ];
+
+            if (!in_array($type, $allowedTypes, true)) {
+                throw new BadRequestHttpException("Unsupported task type: {$type}");
+            }
+
+            /**
+             * 2️⃣ 校验 options
              */
             if (empty($params['options']) || !is_array($params['options'])) {
                 throw new BadRequestHttpException('Invalid options');
             }
 
             /**
-             * 2️⃣ 校验 asset_ids
+             * 3️⃣ 校验 asset_ids
              */
             if (empty($params['asset_ids']) || !is_array($params['asset_ids'])) {
                 throw new BadRequestHttpException('asset_ids must be an array');
@@ -71,7 +89,7 @@ class TaskController extends ApiController
             }
 
             /**
-             * 3️⃣ 查询 Asset
+             * 4️⃣ 查询 Asset
              */
             $assets = Asset::find()
                 ->where(['id' => $assetIds])
@@ -83,7 +101,7 @@ class TaskController extends ApiController
             }
 
             /**
-             * 4️⃣ 过滤过期资源
+             * 5️⃣ 过滤过期资源
              */
             $now = time();
 
@@ -98,11 +116,12 @@ class TaskController extends ApiController
             }
 
             /**
-             * 5️⃣ 构建统一参数传入 Service
+             * 6️⃣ 统一创建任务
              */
             $result = TaskService::createBatchFromAssets(
                 $assets,
-                $params['options']
+                $params['options'],
+                $type
             );
 
             return ApiResponse::success($result, 'tasks created');

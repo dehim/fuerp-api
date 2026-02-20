@@ -15,8 +15,12 @@ class TaskService
      * @param Asset[] $assets
      * @param array   $options
      */
-    public static function createBatchFromAssets(array $assets, array $options): array
-    {
+    public static function createBatchFromAssets(
+        array $assets,
+        array $options,
+        string $type
+    ): array {
+
         if (empty($assets)) {
             throw new BadRequestHttpException('Assets cannot be empty');
         }
@@ -57,8 +61,8 @@ class TaskService
 
             $rows[] = [
                 'id' => $taskId,
-                'batch_id' => $batchId, // ✅ 核心升级
-                'type' => 'image_compress',
+                'batch_id' => $batchId,
+                'type' => $type, // 🔥 不再写死
                 'status' => Task::STATUS_PENDING,
                 'options' => json_encode($taskOptions, JSON_UNESCAPED_UNICODE),
                 'created_at' => $now,
@@ -73,7 +77,6 @@ class TaskService
         $transaction = $db->beginTransaction();
 
         try {
-
             $db->createCommand()
                 ->batchInsert(
                     Task::tableName(),
@@ -83,7 +86,6 @@ class TaskService
                 ->execute();
 
             $transaction->commit();
-
         } catch (\Throwable $e) {
             $transaction->rollBack();
 
