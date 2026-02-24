@@ -170,8 +170,13 @@ class TaskController extends ApiController
 
         Yii::$app->response->format = Response::FORMAT_RAW;
 
-        // ✅ 单图下载
-        if ($task->type === Task::TYPE_IMAGE_COMPRESS) {
+        // ✅ 单图下载类型
+        $singleImageTypes = [
+            Task::TYPE_IMAGE_COMPRESS,
+            Task::TYPE_IMAGE_CROP,
+        ];
+
+        if (in_array($task->type, $singleImageTypes, true)) {
 
             $downloadName = TaskService::buildDownloadFilename($task);
 

@@ -101,25 +101,33 @@ class TaskService
 
     /**
      * ✅ 构建下载文件名
-     * 原文件名 + _compressed + 扩展名
+     * 原文件名 + 动态后缀 + 扩展名
      */
     public static function buildDownloadFilename(Task $task): string
     {
         $result = json_decode($task->result, true);
         $options = json_decode($task->options, true);
 
-        if (!$result || empty($result['output_extension'])) {
-            return 'compressed.jpg';
-        }
+        // 🔹 默认扩展名
+        $extension = $result['output_extension'] ?? 'jpg';
 
-        $extension = $result['output_extension'];
+        // 🔹 类型 → 后缀映射
+        $suffixMap = [
+            Task::TYPE_IMAGE_COMPRESS => 'compressed',
+            Task::TYPE_IMAGE_CROP => 'cropped',
+        ];
+
+        // 🔹 获取后缀
+        $suffix = $suffixMap[$task->type] ?? 'processed';
 
         $originalName = $options['asset_snapshot']['original_name'] ?? null;
 
+        // 🔹 如果没有原始文件名
         if (!$originalName) {
             return sprintf(
-                'compressed_%s.%s',
+                '%s_%s.%s',
                 $task->id,
+                $suffix,
                 $extension
             );
         }
@@ -127,12 +135,13 @@ class TaskService
         // 去掉原扩展名
         $baseName = pathinfo($originalName, PATHINFO_FILENAME);
 
-        // 文件名安全过滤（防止奇怪字符）
+        // 文件名安全过滤
         $baseName = self::sanitizeFilename($baseName);
 
         return sprintf(
-            '%s_compressed.%s',
+            '%s_%s.%s',
             $baseName,
+            $suffix,
             $extension
         );
     }
