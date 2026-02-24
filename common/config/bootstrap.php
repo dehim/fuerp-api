@@ -1,9 +1,5 @@
 <?php
 
-use api\modules\v1\models\Task;
-use api\modules\v1\processors\ImagickProcessor;
-use api\modules\v1\processors\ZipPackProcessor;
-
 Yii::setAlias('@common', dirname(__DIR__));
 Yii::setAlias('@frontend', dirname(dirname(__DIR__)) . '/frontend');
 Yii::setAlias('@backend', dirname(dirname(__DIR__)) . '/backend');
@@ -24,7 +20,8 @@ if (!is_dir($uploadPath)) {
  */
 Yii::$container->set('processor.map', function () {
     return [
-        Task::TYPE_IMAGE_COMPRESS => ImagickProcessor::class,
-        Task::TYPE_BATCH_PACK => ZipPackProcessor::class,
+        \api\modules\v1\models\Task::TYPE_IMAGE_COMPRESS => \api\modules\v1\processors\ImagickProcessor::class,
+        \api\modules\v1\models\Task::TYPE_BATCH_PACK => \api\modules\v1\processors\ZipPackProcessor::class,
+        \api\modules\v1\models\Task::TYPE_IMAGE_CROP => \api\modules\v1\processors\ImageCropProcessor::class,
     ];
 });
