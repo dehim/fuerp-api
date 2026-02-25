@@ -45,7 +45,35 @@ class ImageCropProcessor implements ImageProcessorInterface
         $this->guardImageSize($imagick);
 
         /**
-         * 1️⃣ Crop
+         * 1️⃣ Rotate
+         */
+        if (!empty($options['rotate'])) {
+            $angle = intval($options['rotate']);
+
+            if ($angle !== 0) {
+                $imagick->rotateImage('none', $angle);
+                $imagick->setImagePage(0, 0, 0, 0); // 🔥 很重要
+            }
+        }
+
+        /**
+         * 2️⃣ Flip
+         */
+        if (!empty($options['flip'])) {
+
+            if (!empty($options['flip']['horizontal'])) {
+                $imagick->flopImage();
+            }
+
+            if (!empty($options['flip']['vertical'])) {
+                $imagick->flipImage();
+            }
+
+            $imagick->setImagePage(0, 0, 0, 0); // 🔥 保证重置虚拟画布
+        }
+
+        /**
+         * 3️⃣ Crop（必须最后）
          */
         if (!empty($options['crop'])) {
             $crop = $options['crop'];
@@ -58,31 +86,6 @@ class ImageCropProcessor implements ImageProcessorInterface
             );
 
             $imagick->setImagePage(0, 0, 0, 0);
-        }
-
-        /**
-         * 2️⃣ Rotate
-         */
-        if (!empty($options['rotate'])) {
-            $angle = intval($options['rotate']);
-
-            if ($angle !== 0) {
-                $imagick->rotateImage('none', $angle);
-            }
-        }
-
-        /**
-         * 3️⃣ Flip
-         */
-        if (!empty($options['flip'])) {
-
-            if (!empty($options['flip']['horizontal'])) {
-                $imagick->flopImage();
-            }
-
-            if (!empty($options['flip']['vertical'])) {
-                $imagick->flipImage();
-            }
         }
 
         /**
@@ -125,8 +128,8 @@ class ImageCropProcessor implements ImageProcessorInterface
         $dir = dirname($inputPath);
 
         $ext = $format === 'original'
-            ? pathinfo($inputPath, PATHINFO_EXTENSION)
-            : $format;
+          ? pathinfo($inputPath, PATHINFO_EXTENSION)
+          : $format;
 
         return $dir . '/crop_' . $task->id . '.' . $ext;
     }
