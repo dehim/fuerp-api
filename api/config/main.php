@@ -46,6 +46,8 @@ return [
 
                 // ✅ 根路径 /
                 '' => 'v1/site/index',
+                // 新路径
+                'GET v1/task/stream' => 'v1/task-stream/index',
 
             ],
         ],
